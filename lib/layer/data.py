@@ -323,7 +323,8 @@ class SurfaceBackedLayer (core.LayerBase, lib.autosave.Autosaveable):
 
     ## Flood fill
 
-    def flood_fill(self, x, y, color, bbox, tolerance, dst_layer=None):
+    def flood_fill(self, x, y, color, tolerance, offset, feather,
+                   gap_closing_options, framed, bbox, dst_layer=None):
         """Fills a point on the surface with a color
 
         See `PaintingLayer.flood_fill() for parameters and semantics. This
@@ -1230,6 +1231,51 @@ class PaintingLayer (SurfaceBackedLayer, core.ExternallyEditable):
         u"Layer",
     )
 
+    ## Flood fill
+
+    def get_fillable(self):
+        """True if this layer currently accepts flood fill"""
+        return not self.locked
+
+    def flood_fill(self, x, y, color, tolerance, offset, feather,
+                   gap_closing_options, framed, bbox, dst_layer=None):
+        """Fills a point on the surface with a color
+
+        :param x: Starting point X coordinate
+        :param y: Starting point Y coordinate
+        :param color: an RGB color
+        :type color: tuple
+        :param tolerance: how much filled pixels are permitted to vary
+        :type tolerance: float [0.0, 1.0]
+        :param offset: the post-fill expansion/contraction radius in pixels
+        :type offset: int [-TILE_SIZE, TILE_SIZE]
+        :param feather: the amount to blur the fill, after offset is applied
+        :type feather: int [0, TILE_SIZE]
+        :param gap_closing_options: parameters for gap closing fill, or None
+        :type gap_closing_options: lib.floodfill.GapClosingOptions
+        :param framed: Whether the frame is enabled or not.
+        :type framed: bool
+        :param bbox: Bounding box: limits the fill
+        :type bbox: lib.helpers.Rect or equivalent 4-tuple
+        :param dst_layer: Optional target layer (default is self!)
+        :type dst_layer: StrokemappedPaintingLayer
+
+        The `tolerance` parameter controls how much pixels are permitted to
+        vary from the starting color.  We use the 4D Euclidean distance from
+        the starting point to each pixel under consideration as a metric,
+        scaled so that its range lies between 0.0 and 1.0.
+
+        The default target layer is `self`. This method invalidates the filled
+        area of the target layer's surface, queueing a redraw if it is part of
+        a visible document.
+        """
+        if dst_layer is None:
+            dst_layer = self
+        dst_layer.autosave_dirty = True   # XXX hmm, not working?
+        self._surface.flood_fill(x, y, color, tolerance, offset, feather,
+                                 gap_closing_options, framed, bbox,
+                                 dst_surface=dst_layer._surface)
+
     # The un-namespaced legacy attribute name is deprecated since
     # MyPaint v1.2.0, and painting layers in OpenRaster files will not
     # be saved with it beginning with v1.3.0 at the earliest.
@@ -1320,39 +1366,6 @@ class PaintingLayer (SurfaceBackedLayer, core.ExternallyEditable):
                 self.load_strokemap_from_file(sfp, x, y)
         else:
             raise ValueError("either orazip or oradir must be specified")
-
-    ## Flood fill
-
-    def flood_fill(self, x, y, color, bbox, tolerance, dst_layer=None):
-        """Fills a point on the surface with a color
-
-        :param x: Starting point X coordinate
-        :param y: Starting point Y coordinate
-        :param color: an RGB color
-        :type color: tuple
-        :param bbox: Bounding box: limits the fill
-        :type bbox: lib.helpers.Rect or equivalent 4-tuple
-        :param tolerance: how much filled pixels are permitted to vary
-        :type tolerance: float [0.0, 1.0]
-        :param dst_layer: Optional target layer (default is self!)
-        :type dst_layer: PaintingLayer
-
-        The `tolerance` parameter controls how much pixels are permitted to
-        vary from the starting color.  We use the 4D Euclidean distance from
-        the starting point to each pixel under consideration as a metric,
-        scaled so that its range lies between 0.0 and 1.0.
-
-        The default target layer is `self`. This method invalidates the filled
-        area of the target layer's surface, queueing a redraw if it is part of
-        a visible document.
-        """
-        if dst_layer is None:
-            dst_layer = self
-        dst_layer.autosave_dirty = True   # XXX hmm, not working?
-        self._surface.flood_fill(x, y, color, bbox, tolerance,
-                                 dst_surface=dst_layer._surface)
-
-    ## Painting
 
     def stroke_to(self, brush, x, y, pressure, xtilt, ytilt, dtime):
         """Render a part of a stroke to the canvas surface

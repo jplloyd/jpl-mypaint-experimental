@@ -458,14 +458,19 @@ class FloodFill (Command):
 
     display_name = _("Flood Fill")
 
-    def __init__(self, doc, x, y, color, bbox, tolerance,
+    def __init__(self, doc, x, y, color, tolerance, offset, feather,
+                 gap_closing_options, bbox,
                  sample_merged, make_new_layer, **kwds):
         super(FloodFill, self).__init__(doc, **kwds)
         self.x = x
         self.y = y
         self.color = color
-        self.bbox = bbox
         self.tolerance = tolerance
+        self.offset = offset
+        self.feather = feather
+        self.gap_closing_options = gap_closing_options
+        self.framed = doc.get_frame_enabled()
+        self.bbox = bbox
         self.sample_merged = sample_merged
         self.make_new_layer = make_new_layer
         self.new_layer = None
@@ -498,8 +503,10 @@ class FloodFill (Command):
             self.snapshot = layers.current.save_snapshot()
             dst_layer = layers.current
         # Fill connected areas of the source into the destination
-        src_layer.flood_fill(self.x, self.y, self.color, self.bbox,
-                             self.tolerance, dst_layer=dst_layer)
+        fill_args = (self.x, self.y, self.color, self.tolerance,
+                     self.offset, self.feather, self.gap_closing_options,
+                     self.framed, self.bbox)
+        src_layer.flood_fill(*fill_args, dst_layer=dst_layer)
 
     def undo(self):
         layers = self.doc.layer_stack
