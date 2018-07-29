@@ -39,6 +39,7 @@ from . import layermodes  # noqa: F401 (registration of GObject classes)
 from . import quickchoice
 import gui.viewmanip  # noqa: F401 (registration of GObject classes)
 import gui.layermanip  # noqa: F401 (registration of GObject classes)
+import gui.brushselectmode  # noqa: F401 (registration of GObject classes)
 from lib.color import HSVColor
 from . import uicolor
 import gui.picker
