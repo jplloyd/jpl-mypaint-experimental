@@ -181,6 +181,10 @@
         <menuitem action='Purer'/>
         <menuitem action='Grayer'/>
       </menu>
+      <menu action='ColorSpaceMenu'>
+	<menuitem action='HSVModel'/>
+	<menuitem action='HCYModel'/>
+      </menu>
       <!-- Palette -->
       <separator/>
       <menuitem action='PalettePrev'/>

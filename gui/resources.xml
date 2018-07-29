@@ -265,6 +265,24 @@ Vocabulary
         </object>
         <accelerator key="a"/>
       </child>
+      <!-- Color adjustment color space -->
+      <child>
+        <object class="GtkRadioAction" id="HSVModel">
+          <property name="label" translatable="yes" context="Menu→Color→Select Color Space, Accel Editor (labels)">Hue/Saturation/Value (HSV)</property>
+          <property name="tooltip" translatable="yes" context="Accel Editor (descriptions)">Perform color adjustments in HSV</property>
+          <signal name="changed" handler="adjustment_color_space_changed_cb"/>
+	  <property name="current-value">0</property>
+	  <property name="value">0</property>
+        </object>
+      </child>
+      <child>
+        <object class="GtkRadioAction" id="HCYModel">
+          <property name="label" translatable="yes" context="Menu→Color→Select Color Space, Accel Editor (labels)">Hue/Chroma/Luminance (HCY)</property>
+          <property name="tooltip" translatable="yes" context="Accel Editor (descriptions)">Perform color adjustments in HCY</property>
+	  <property name="group">HSVModel</property>
+	  <property name="value">1</property>
+        </object>
+      </child>
       <!-- Brush painting color -->
       <child>
         <object class="GtkAction" id="Brighter">
@@ -950,6 +968,12 @@ Vocabulary
       <child>
         <object class="GtkAction" id="ColorMenu">
           <property name="label" translatable="yes" context="Menu (labels)">Color</property>
+          <!-- NO TOOLTIP OR SHORTCUT: this is a menu -->
+        </object>
+      </child>
+      <child>
+        <object class="GtkAction" id="ColorSpaceMenu">
+          <property name="label" translatable="yes" context="Menu→Color (labels)">Select Color Space</property>
           <!-- NO TOOLTIP OR SHORTCUT: this is a menu -->
         </object>
       </child>

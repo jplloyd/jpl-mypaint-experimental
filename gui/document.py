@@ -29,6 +29,7 @@ from gi.repository import Gtk
 from gi.repository import Gdk
 from gi.repository import GLib
 
+import lib.color
 import lib.layer
 import lib.helpers
 from lib.helpers import clamp
@@ -350,6 +351,11 @@ class Document (CanvasController):  # TODO: rename to "DocumentController"
             toggle_action.set_active(
                 self.app.preferences['misc.context_restores_color']
             )
+
+        # Set active color adjustment space from settings
+        adj_colspace = self.app.preferences.get('active_color_space', 0)
+        self.app.builder.get_object("HSVModel").set_current_value(adj_colspace)
+        self._set_color_space(adj_colspace)
 
         #: Saved transformation to allow FitView to be toggled.
         self.saved_view = None
@@ -1464,6 +1470,32 @@ class Document (CanvasController):  # TODO: rename to "DocumentController"
             if bool(action.get_active()) != bool(model_state):
                 action.set_active(model_state)
 
+    ## Color space settings
+
+    def adjustment_color_space_changed_cb(self, action, new_action):
+        """ GtkRadioAction callback: switch the color space for adjustments"""
+        self._set_color_space(new_action.get_current_value())
+
+    def _set_color_space(self, space_index):
+        """ Update color space preference and set conversion functions"""
+        get_col_hsv = self.app.brush.get_color_hsv
+        set_col_hsv = self.app.brush.set_color_hsv
+
+        def get_col_hcy():
+            return lib.color.RGB_to_HCY(self.app.brush.get_color_rgb())
+
+        def set_col_hcy(col):
+            self.app.brush.set_color_rgb(lib.color.HCY_to_RGB(col))
+
+        spaces = [
+            (get_col_hsv, set_col_hsv),
+            (get_col_hcy, set_col_hcy)
+        ]
+        self._get_brush_color = spaces[space_index][0]
+        self._set_brush_color = spaces[space_index][1]
+
+        self.app.preferences['active_color_space'] = space_index
+
     ## Brush settings callbacks
 
     def brush_bigger_cb(self, action):
@@ -1489,57 +1521,68 @@ class Document (CanvasController):  # TODO: rename to "DocumentController"
 
     def brighter_cb(self, action):
         """``Brighter`` GtkAction callback: lighten the brush color"""
-        # TODO: use HCY?
-        h, s, v = self.app.brush.get_color_hsv()
-        v += 0.08
-        if v > 1.0:
-            v = 1.0
-        self.app.brush.set_color_hsv((h, s, v))
+        self.offset_brush_brightness(0.08)
 
     def darker_cb(self, action):
         """``Darker`` GtkAction callback: darken the brush color"""
-        # TODO: use HCY?
-        h, s, v = self.app.brush.get_color_hsv()
-        v -= 0.08
-        # stop a little higher than 0.0, to avoid resetting hue to 0
-        if v < 0.005:
-            v = 0.005
-        self.app.brush.set_color_hsv((h, s, v))
+        self.offset_brush_brightness(-0.08)
 
     def increase_hue_cb(self, action):
         """Clockwise hue rotation ("IncreaseHue" action)."""
-        # TODO: use HCY?
-        h, s, v = self.app.brush.get_color_hsv()
-        e = 0.015
-        h = (h + e) % 1.0
-        self.app.brush.set_color_hsv((h, s, v))
+        self.offset_brush_hue(0.015)
 
     def decrease_hue_cb(self, action):
         """Anticlockwise hue rotation ("DecreaseHue" action)."""
-        # TODO: use HCY?
-        h, s, v = self.app.brush.get_color_hsv()
-        e = 0.015
-        h = (h - e) % 1.0
-        self.app.brush.set_color_hsv((h, s, v))
+        self.offset_brush_hue(-0.015)
 
     def purer_cb(self, action):
         """``Purer`` GtkAction callback: make the brush color less grey"""
-        # TODO: use HCY?
-        h, s, v = self.app.brush.get_color_hsv()
-        s += 0.08
-        if s > 1.0:
-            s = 1.0
-        self.app.brush.set_color_hsv((h, s, v))
+        self.offset_brush_saturation(0.08)
 
     def grayer_cb(self, action):
         """``Grayer`` GtkAction callback: make the brush color more grey"""
-        # TODO: use HCY?
-        h, s, v = self.app.brush.get_color_hsv()
-        s -= 0.08
-        # stop a little higher than 0.0, to avoid resetting hue to 0
-        if s < 0.005:
-            s = 0.005
-        self.app.brush.set_color_hsv((h, s, v))
+        self.offset_brush_saturation(-0.08)
+
+    # Adjust brush color components
+    def offset_brush_hue(self, val):
+        """ Change the brush hue, rotating around the active color space"""
+        self._set_brush_color(
+            self._adjust_hue(self._get_brush_color(), val)
+        )
+
+    def offset_brush_saturation(self, val):
+        """ Change the brush saturation in the active color space"""
+        self._set_brush_color(
+            self._adjust_saturation(self._get_brush_color(), val)
+        )
+
+    def offset_brush_brightness(self, val):
+        """ Change the brush brightness in the active color space"""
+        self._set_brush_color(
+            self._adjust_brightness(self._get_brush_color(), val)
+        )
+
+    # Color component adjustments
+    def _adjust_hue(self, col, offset):
+        """ Return the given HSV-like color triple with offset hue"""
+        h, s, v = col
+        return ((h + offset) % 1.0, s, v)
+
+    def _adjust_saturation(self, col, offset):
+        """ Return the given HSV-like color triple with offset saturation"""
+        h, s, v = col
+        return (h, self._sv_clamp(s + offset), v)
+
+    def _adjust_brightness(self, col, offset):
+        """ Return the given HSV-like color triple with offset brightness"""
+        h, s, v = col
+        return (h, s, self._sv_clamp(v + offset))
+
+    def _sv_clamp(self, component):
+        """ Clamp saturation/value component to not lose hue information
+        """
+        lim = 0.004  # 1/256 ~= 0.0039
+        return clamp(component, lim, 1 - lim)
 
     ## Brush settings
 
