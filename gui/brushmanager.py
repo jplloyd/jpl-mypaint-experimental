@@ -62,7 +62,7 @@ _DEFAULT_BRUSH = 'deevad/2B_pencil'  # TODO: phase out and use heuristics?
 _DEFAULT_ERASER = 'deevad/kneaded_eraser_large'  # TODO: -----------"---------
 _DEVBRUSH_NAME_PREFIX = "devbrush_"
 _BRUSH_HISTORY_NAME_PREFIX = "history_"
-_BRUSH_HISTORY_SIZE = 5
+_BRUSH_HISTORY_SIZE = 9
 _NUM_BRUSHKEYS = 10
 
 _BRUSHPACK_README = "readme.txt"

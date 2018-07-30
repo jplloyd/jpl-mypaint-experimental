@@ -106,6 +106,7 @@ class BrushResizeMode(gui.mode.OneshotDragMode):
     """
 
     ACTION_NAME = 'BrushResizeMode'
+    _OPTIONS_WIDGET = None
 
     pointer_behavior = gui.mode.Behavior.EDIT_OBJECTS
     supports_button_switching = True

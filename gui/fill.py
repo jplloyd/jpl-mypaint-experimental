@@ -33,9 +33,10 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
 
     ACTION_NAME = "FloodFillMode"
     permitted_switch_actions = set([
+        'HueAdjustMode', 'HueSatValAdjustMode',
         'RotateViewMode', 'ZoomViewMode', 'PanViewMode',
         'ColorPickMode', 'ShowPopupMenu',
-        ])
+    ])
 
     _OPTIONS_WIDGET = None
     _CURSOR_FILL_PERMITTED = gui.cursor.Name.CROSSHAIR_OPEN_PRECISE

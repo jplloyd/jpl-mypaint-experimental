@@ -186,10 +186,10 @@ class BrushSelectMode(gui.mode.OneshotDragMode):
         self.bm = bm = app.brushmanager
         currentBrush = bm.selected_brush
         cBrushName = currentBrush.get_display_name()
-        self.history = filter(
+        self.history = list(filter(
             lambda mb: mb.get_display_name() != cBrushName,
             bm.history
-        )
+        ))
         self.histLength = len(self.history)
         self.x, self.y = self.current_position()
         self.selected = None
