@@ -608,6 +608,8 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
             # FIXME: should not do that, should use open(unicode_object)
 
         try:
+            if PY3:
+                filename_sys = filename_sys.decode()
             flags = mypaintlib.load_png_fast_progressive(
                 filename_sys,
                 get_buffer,

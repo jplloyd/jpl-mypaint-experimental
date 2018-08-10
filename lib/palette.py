@@ -100,8 +100,14 @@ class Palette (object):
         elif filehandle:
             self.load(filehandle, silent=True)
         elif filename:
-            with open(filename, "r", encoding="utf-8", errors="replace") as fp:
-                self.load(fp, silent=True)
+            if PY3:
+                with open(
+                        filename, "r", encoding="utf-8",
+                        errors="replace") as fp:
+                    self.load(fp, silent=True)
+            else:
+                with open(filename, "r") as fp:
+                    self.load(fp, silent=True)
 
     def clear(self, silent=False):
         """Resets the palette to its initial state.
