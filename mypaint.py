@@ -202,9 +202,13 @@ def get_paths():
     assert isinstance(libpath, unicode)
 
     datapath = libpath
-    if not os.path.isdir(join(datapath, 'brushes')):
+
+    # There is no need to return the datadir of mypaint-data.
+    # It will be set at build time. I still check brushes presence.
+    import lib.config
+    if not os.path.isdir(lib.config.mypaint_brushdir):
         logger.critical('Default brush collection not found!')
-        logger.critical('It should have been here: %r', datapath)
+        logger.critical('It should have been here: %r', lib.config.mypaint_brushdir)
         sys.exit(1)
 
     # Old style config file and user data locations.
@@ -380,8 +384,12 @@ def init_gettext(localepath):
         if bindtextdomain and bind_textdomain_codeset and textdomain:
             assert os.path.exists(path)
             assert os.path.isdir(path)
-            p = bindtextdomain(dom, path)
-            c = bind_textdomain_codeset(dom, codeset)
+            if sys.platform == 'win32':
+                p = bindtextdomain(dom.encode('utf-8'), path.encode('utf-8'))
+                c = bind_textdomain_codeset(dom.encode('utf-8'), codeset.encode('utf-8'))
+            else:
+                p = bindtextdomain(dom, path)
+                c = bind_textdomain_codeset(dom, codeset)
             logger.debug("C bindtextdomain(%r, %r): %r", dom, path, p)
             logger.debug(
                 "C bind_textdomain_codeset(%r, %r): %r",
@@ -400,7 +408,10 @@ def init_gettext(localepath):
             dom, codeset, c,
         )
     if bindtextdomain and bind_textdomain_codeset and textdomain:
-        d = textdomain(defaultdom)
+        if sys.platform == 'win32':
+            d = textdomain(defaultdom.encode('utf-8'))
+        else:
+            d = textdomain(defaultdom)
         logger.debug("C textdomain(%r): %r", defaultdom, d)
     d = gettext.textdomain(defaultdom)
     logger.debug("Python textdomain(%r): %r", defaultdom, d)

@@ -58,7 +58,7 @@ NEW_BRUSH_GROUP = 'new'  #: Home for newly created brushes
 ## Internal module constants
 
 _DEFAULT_STARTUP_GROUP = 'set#2'  # Suggestion only (FIXME: no effect?)
-_DEFAULT_BRUSH = 'deevad/2B_pencil'  # TODO: phase out and use heuristics?
+_DEFAULT_BRUSH = 'Dieterle/Fan#1'  # TODO: phase out and use heuristics?
 _DEFAULT_ERASER = 'deevad/kneaded_eraser_large'  # TODO: -----------"---------
 _DEVBRUSH_NAME_PREFIX = "devbrush_"
 _BRUSH_HISTORY_NAME_PREFIX = "history_"
@@ -195,7 +195,7 @@ class BrushManager (object):
         >>> from tempfile import mkdtemp
         >>> from shutil import rmtree
         >>> tmpdir = mkdtemp(u".brushes")
-        >>> bm = BrushManager(u"./brushes", tmpdir, app=None)
+        >>> bm = BrushManager(lib.config.mypaint_brushdir, tmpdir, app=None)
         >>> len(bm.groups) > 0
         True
         >>> all([isinstance(k, unicode) for k in bm.groups.keys()])
@@ -257,7 +257,7 @@ class BrushManager (object):
         from tempfile import mkdtemp
         from shutil import rmtree
 
-        dist_brushes = u"./brushes"
+        dist_brushes = lib.config.mypaint_brushdir
         tmp_user_brushes = mkdtemp(suffix=u"_brushes")
         try:
             bm = cls(dist_brushes, tmp_user_brushes, app=None)

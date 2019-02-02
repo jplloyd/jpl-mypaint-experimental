@@ -607,6 +607,10 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
             filename_sys = filename.encode(sys.getfilesystemencoding())
             # FIXME: should not do that, should use open(unicode_object)
 
+        if PY3:
+            filename_sys = filename_sys.decode()
+            # FIXME: https://github.com/mypaint/mypaint/issues/906
+
         try:
             if PY3:
                 filename_sys = filename_sys.decode()

@@ -71,10 +71,10 @@ install_dependencies() {
     pacman --remove --noconfirm ${PKG_PREFIX}-mypaint-git || true
     pacman --remove --noconfirm ${PKG_PREFIX}-mypaint || true
     pacman --remove --noconfirm ${PKG_PREFIX}-libmypaint-git || true
-    pacman --remove --noconfirm ${PKG_PREFIX}-libmypaint || true
+    pacman --remove --noconfirm ${PKG_PREFIX}-mypaint-brushes2 || true
 
-    loginfo "Upgrading MSYS2 environment"
-    pacman -Syu --noconfirm
+    #loginfo "Upgrading MSYS2 environment"
+    #pacman -Syu --noconfirm
 
     loginfo "Installing pre-built dependencies for MyPaint"
     pacman -S --noconfirm --needed --noprogressbar \
@@ -310,6 +310,7 @@ case "$1" in
         install_dependencies
         update_mingw_src
         build_pkg "libmypaint-git" true
+        build_pkg "mypaint-brushes2" true
         ;;
     build)
         build_for_testing

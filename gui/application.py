@@ -82,6 +82,7 @@ from .brushcolor import BrushColorManager
 from .overlays import LastPaintPosOverlay  # noqa: F401
 from .overlays import ScaleOverlay  # noqa: F401
 from .buttonmap import ButtonMapping
+import lib.config
 import lib.glib
 import gui.cursor
 import lib.fileutils
@@ -93,7 +94,6 @@ import gui.profiling
 from lib.pycompat import unicode
 
 logger = logging.getLogger(__name__)
-
 
 ## Utility methods
 
@@ -330,7 +330,7 @@ class Application (object):
         self.scratchpad_doc = document.Document(self, scratchpad_tdw,
                                                 scratchpad_model)
         self.brushmanager = brushmanager.BrushManager(
-            join(self.state_dirs.app_data, 'brushes'),
+            lib.config.mypaint_brushdir,
             join(self.state_dirs.user_data, 'brushes'),
             self,
         )
@@ -497,7 +497,7 @@ class Application (object):
         if sys.platform == 'win32':
             ud_docs = lib.glib.get_user_special_dir(
                 GLib.UserDirectory.DIRECTORY_DOCUMENTS,
-            ).decode("utf-8")
+            )
             scrappre = os.path.join(ud_docs, u'MyPaint', u'scrap')
         else:
             scrappre = u'~/MyPaint/scrap'
@@ -525,6 +525,7 @@ class Application (object):
             ),
             'ui.toolbar_icon_size': 'large',
             'ui.dark_theme_variant': True,
+            'ui.rendered_tile_cache_size': 16384,
             'saving.default_format': 'openraster',
             'brushmanager.selected_brush': None,
             'brushmanager.selected_groups': [],
@@ -572,7 +573,7 @@ class Application (object):
             # to assign panning to this button by default.
             linux_mapping = default_config["input.button_mapping"]
             default_config["input.button_mapping"] = {}
-            for bp, actname in linux_mapping.iteritems():
+            for bp, actname in linux_mapping.items():
                 bp = bp.replace("Button2", "ButtonTMP")
                 bp = bp.replace("Button3", "Button2")
                 bp = bp.replace("ButtonTMP", "Button3")
