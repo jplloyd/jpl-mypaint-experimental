@@ -453,7 +453,7 @@ class SurfaceBackedLayer (core.LayerBase, lib.autosave.Autosaveable):
 
     @staticmethod
     def _make_refname(prefix, path, suffix, sep='-'):
-        """Internal: standardized filename for something wiith a path"""
+        """Internal: standardized filename for something with a path"""
         assert "." in suffix
         path_ref = sep.join([("%02d" % (n,)) for n in path])
         if not suffix.startswith("."):
@@ -1422,7 +1422,6 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
     # until v2.0.0.
 
     _ORA_STROKEMAP_ATTR = "{%s}strokemap" % (lib.xml.OPENRASTER_MYPAINT_NS,)
-    _ORA_STROKEMAP_LEGACY_ATTR = "mypaint_strokemap_v2"
 
     ## Initializing & resetting
 
@@ -1478,7 +1477,6 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
         y += int(attrs.get('y', 0))
         supported_strokemap_attrs = [
             self._ORA_STROKEMAP_ATTR,
-            self._ORA_STROKEMAP_LEGACY_ATTR,
         ]
         strokemap_name = None
         for attr_qname in supported_strokemap_attrs:
@@ -1641,7 +1639,6 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
         # Add strokemap XML attrs and return.
         # See comment above for compatibility strategy.
         elem.attrib[self._ORA_STROKEMAP_ATTR] = storepath
-        elem.attrib[self._ORA_STROKEMAP_LEGACY_ATTR] = storepath
         return elem
 
     def queue_autosave(self, oradir, taskproc, manifest, bbox, **kwargs):
@@ -1667,7 +1664,6 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
         # Add strokemap XML attrs and return.
         # See comment above for compatibility strategy.
         elem.attrib[self._ORA_STROKEMAP_ATTR] = dat_relpath
-        elem.attrib[self._ORA_STROKEMAP_LEGACY_ATTR] = dat_relpath
         manifest.add(dat_relpath)
         return elem
 
