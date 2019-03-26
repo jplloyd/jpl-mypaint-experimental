@@ -127,6 +127,10 @@ class RootLayerStack (group.LayerStack):
             cachesize = self.app.preferences['ui.rendered_tile_cache_size']
         except: 
             cachesize = 16384
+        try:
+            self.EOTF = self.app.preferences['display.colorspace_EOTF']
+        except: 
+            self.EOTF = 2.2
         self._render_cache = lib.cache.LRUCache(capacity=cachesize)
         # Background
         default_bg = (255, 255, 255)
@@ -518,7 +522,7 @@ class RootLayerStack (group.LayerStack):
                         conv = lib.mypaintlib.tile_convert_rgba16_to_rgba8
                     else:
                         conv = lib.mypaintlib.tile_convert_rgbu16_to_rgbu8
-                    conv(dst, dst_8bpc_orig)
+                    conv(dst, dst_8bpc_orig, self.EOTF)
 
                     if use_cache:
                         self._render_cache_set(key1, key2, dst_8bpc_orig)
@@ -685,7 +689,7 @@ class RootLayerStack (group.LayerStack):
                 conv = lib.mypaintlib.tile_convert_rgba16_to_rgba8
             else:
                 conv = lib.mypaintlib.tile_convert_rgbu16_to_rgbu8
-            conv(dst, dst_8bpc_orig)
+            conv(dst, dst_8bpc_orig, self.EOTF)
             dst = dst_8bpc_orig
 
     def _validate_layer_bbox_arg(self, layer, bbox,
@@ -1950,9 +1954,9 @@ class RootLayerStack (group.LayerStack):
         # Backdrops need removing if they combine with this layer's data.
         # Surface-backed layers' tiles can just be used as-is if they're
         # already fairly normal.
-        # If default mode is Spectral WGM, we shouldn't remove backdrop.
         needs_backdrop_removal = True
-        if srclayer.mode == lib.mypaintlib.CombineNormal and srclayer.opacity == 1.0:
+        if ((srclayer.mode == lib.mypaintlib.CombineNormal or
+            srclayer.mode == lib.mypaintlib.CombineSpectralWGM) and srclayer.opacity == 1.0):
 
             # Optimizations for the tiled-surface types
             if isinstance(srclayer, data.PaintingLayer):
@@ -1968,11 +1972,13 @@ class RootLayerStack (group.LayerStack):
                 needs_backdrop_removal = (srclayer.mode == PASS_THROUGH_MODE)
             else:
                 needs_backdrop_removal = False
-        if srclayer.mode == lib.mypaintlib.CombineSpectralWGM:
-            needs_backdrop_removal = False
         # Begin building output, collecting tile indices and strokemaps.
         dstlayer = data.PaintingLayer()
         dstlayer.name = srclayer.name
+        if srclayer.mode == lib.mypaintlib.CombineSpectralWGM:
+            dstlayer.mode = srclayer.mode
+        else:
+            dstlayer.mode = lib.mypaintlib.CombineNormal
         tiles = set()
         for p, layer in self.walk():
             if not path_startswith(p, path):
@@ -2092,6 +2098,11 @@ class RootLayerStack (group.LayerStack):
         assert None not in merge_layers
         # Build output strokemap, determine set of data tiles to merge
         dstlayer = data.PaintingLayer()
+        srclayer = self.deepget(path)
+        if srclayer.mode == lib.mypaintlib.CombineSpectralWGM:
+            dstlayer.mode = srclayer.mode 
+        else:
+            dstlayer.mode = lib.mypaintlib.CombineNormal
         tiles = set()
         for layer in merge_layers:
             tiles.update(layer.get_tile_coords())
@@ -2120,7 +2131,7 @@ class RootLayerStack (group.LayerStack):
                     layer._surface.composite_tile(
                         dst, True,
                         tx, ty, mipmap_level=0,
-                        mode=mode
+                        mode=mode, opacity=layer.opacity
                     )
         return dstlayer
 
@@ -2166,6 +2177,7 @@ class RootLayerStack (group.LayerStack):
 
         # Start making the output layer.
         dstlayer = data.PaintingLayer()
+        dstlayer.mode = lib.mypaintlib.CombineNormal
         dstlayer.strokes = strokes
         name = C_(
             "layer default names: joiner punctuation for merged layers",
@@ -2288,6 +2300,7 @@ class RootLayerStack (group.LayerStack):
 
         # Insert a layer to contain all the common pixels or tiles
         common_layer = data.PaintingLayer()
+        common_layer.mode = lib.mypaintlib.CombineNormal
         common_layer.name = C_(
             "layer default names: refactor: name of the common areas layer",
             u"Common",
@@ -2748,7 +2761,7 @@ class _TileRenderWrapper (TileAccessible, TileBlittable):
                 conv = lib.mypaintlib.tile_convert_rgba16_to_rgba8
             else:
                 conv = lib.mypaintlib.tile_convert_rgbu16_to_rgbu8
-            conv(src, dst)
+            conv(src, dst, self.EOTF)
 
     def __getattr__(self, attr):
         """Pass through calls to other methods"""

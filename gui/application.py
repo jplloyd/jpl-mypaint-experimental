@@ -268,6 +268,10 @@ class Application (object):
         )
         self.cursors = gui.cursor.CustomCursorMaker(self)
 
+        # App-level settings
+        self._preferences = lib.observable.ObservableDict()
+        self.load_settings()
+
         # Unmanaged main brush.
         # Always the same instance (we can attach settings_observers).
         # This brush is where temporary changes (color, size...) happen.
@@ -277,9 +281,10 @@ class Application (object):
         # Global pressure mapping function, ignored unless set
         self.pressure_mapping = None
 
-        # App-level settings
-        self._preferences = lib.observable.ObservableDict()
-        self.load_settings()
+        # Fake inputs to send when using a mouse.  Adjustable
+        # via slider and/or hotkeys
+        self.fakepressure = 0.5
+        self.fakerotation = 0.5
 
         # Keyboard manager
         self.kbm = keyboard.KeyboardManager(self)
@@ -360,6 +365,8 @@ class Application (object):
         #: value of that setting for the app's current brush.
         self.brush_adjustment = {}
         self.init_brush_adjustments()
+        # Extend with some fake inputs that act kind of like brush settings
+        self.fake_adjustment = {}
 
         # Connect signals defined in resources.xml
         callback_finder = CallbackFinder(signal_callback_objs)
@@ -506,6 +513,8 @@ class Application (object):
             'input.device_mode': 'screen',
             'input.global_pressure_mapping': [(0.0, 1.0), (1.0, 0.0)],
             'input.use_barrel_rotation': True,
+            'input.barrel_rotation_subtract_ascension': True,
+            'input.barrel_rotation_offset': 0.5,
             'view.default_zoom': 1.0,
             'view.real_alpha_checks': True,
             'ui.hide_menubar_in_fullscreen': True,
@@ -536,6 +545,8 @@ class Application (object):
             'document.autosave_backups': True,
             'document.autosave_interval': 10,
 
+            # configurable EOTF.  Set to 1.0 for legacy non-linear behaviour
+            'display.colorspace_EOTF': 2.2,
             'display.colorspace': "srgb",
             # sRGB is a good default even for OS X since v10.6 / Snow
             # Leopard: http://support.apple.com/en-us/HT3712.
@@ -554,9 +565,10 @@ class Application (object):
             # so provide a Ctrl-based equivalent for all alt actions.
             'input.button_mapping': {
                 # Note that space is treated as a fake Button2
-                '<Shift>Button1': 'StraightMode',
-                '<Control>Button1': 'ColorPickMode',
-                '<Alt>Button1': 'ColorPickMode',
+                # It is time to free up the modifiers and Button1
+                # '<Shift>Button1': 'StraightMode',
+                # '<Control>Button1': 'ColorPickMode',
+                # '<Alt>Button1': 'ColorPickMode',
                 'Button2': 'PanViewMode',
                 '<Shift>Button2': 'RotateViewMode',
                 '<Control>Button2': 'ZoomViewMode',

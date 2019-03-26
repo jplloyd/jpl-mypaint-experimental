@@ -92,6 +92,12 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         If the current layer is not fillable, a new layer will always be
         created for the fill.
         """
+        from gui.application import get_app
+        self.app = get_app()
+        try:
+            self.EOTF = self.app.preferences['display.colorspace_EOTF']
+        except: 
+            self.EOTF = 2.2
         x, y = tdw.display_to_model(event.x, event.y)
         self._x = x
         self._y = y
@@ -104,7 +110,7 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         if not rootstack.current.get_fillable():
             make_new_layer = True
         rgb = color.get_rgb()
-        rgb = (rgb[0]**2.4, rgb[1]**2.4, rgb[2]**2.4)
+        rgb = (rgb[0]**self.EOTF, rgb[1]**self.EOTF, rgb[2]**self.EOTF)
         tdw.doc.flood_fill(x, y, rgb,
                            tolerance=opts.tolerance,
                            offset=opts.offset, feather=opts.feather,
