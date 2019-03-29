@@ -19,6 +19,7 @@ from gettext import gettext as _
 
 import gui.mode
 import gui.cursor
+import gui.blendmodehandler
 
 import lib.floodfill
 
@@ -37,8 +38,11 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         'ColorPickMode', 'ShowPopupMenu',
         ])
 
+    _BLEND_MODES = None
     _OPTIONS_WIDGET = None
-    _CURSOR_FILL_PERMITTED = gui.cursor.Name.CROSSHAIR_OPEN_PRECISE
+    _CURSOR_FILL_NORMAL = gui.cursor.Name.CROSSHAIR_OPEN_PRECISE
+    _CURSOR_FILL_ERASER = gui.cursor.Name.ERASER
+    _CURSOR_FILL_ALPHA_LOCKED = gui.cursor.Name.ALPHA_LOCK
     _CURSOR_FILL_FORBIDDEN = gui.cursor.Name.ARROW_FORBIDDEN
 
     ## Instance vars (and defaults)
@@ -46,7 +50,7 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
     pointer_behavior = gui.mode.Behavior.PAINT_NOBRUSH
     scroll_behavior = gui.mode.Behavior.CHANGE_VIEW
 
-    _current_cursor = _CURSOR_FILL_PERMITTED
+    _current_cursor = _CURSOR_FILL_NORMAL
     _tdws = None
     _fill_permitted = True
     _x = None
@@ -59,17 +63,27 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         app = get_app()
         return app.cursors.get_action_cursor(self.ACTION_NAME, name)
 
+    def get_current_cursor(self):
+        if self.bm.eraser_mode.active:
+            return self._CURSOR_FILL_ERASER
+        elif self.bm.lock_alpha_mode.active:
+            return self._CURSOR_FILL_ALPHA_LOCKED
+        else:
+            return self._CURSOR_FILL_NORMAL
+
     ## Method defs
 
     def enter(self, doc, **kwds):
         super(FloodFillMode, self).enter(doc, **kwds)
         self._tdws = set([self.doc.tdw])
+        self.app.blendmodemanager.register(self.bm)
         rootstack = self.doc.model.layer_stack
         rootstack.current_path_updated += self._update_ui
         rootstack.layer_properties_changed += self._update_ui
         self._update_ui()
 
     def leave(self, **kwds):
+        self.app.blendmodemanager.deregister(self.bm)
         rootstack = self.doc.model.layer_stack
         rootstack.current_path_updated -= self._update_ui
         rootstack.layer_properties_changed -= self._update_ui
@@ -84,6 +98,14 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
 
     def __init__(self, ignore_modifiers=False, **kwds):
         super(FloodFillMode, self).__init__(**kwds)
+        from gui.application import get_app
+        self.app = get_app()
+        self.bm = self.get_blend_modes()
+        self.bm.mode_changed += self.update_blendmode
+
+    def update_blendmode(self, bm, old, new):
+        if(old is not new):
+            self._update_ui()
 
     def clicked_cb(self, tdw, event):
         """Flood-fill with the current settings where clicked
@@ -91,8 +113,6 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         If the current layer is not fillable, a new layer will always be
         created for the fill.
         """
-        from gui.application import get_app
-        self.app = get_app()
         try:
             self.EOTF = self.app.preferences['display.colorspace_EOTF']
         except: 
@@ -153,7 +173,7 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
 
         # Update cursor of any TDWs we've crossed
         if self._fill_permitted:
-            cursor = self._CURSOR_FILL_PERMITTED
+            cursor = self.get_current_cursor()
         else:
             cursor = self._CURSOR_FILL_FORBIDDEN
 
@@ -161,6 +181,15 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
             self._current_cursor = cursor
             for tdw in self._tdws:
                 tdw.set_override_cursor(self.cursor)
+
+    ## Fill blend modes
+    def get_blend_modes(self):
+        """Get the (class singleton) blend modes manager"""
+        cls = self.__class__
+        if cls._BLEND_MODES is None:
+            cls._BLEND_MODES = gui.blendmodehandler.BlendModes()
+            cls._BLEND_MODES.colorize_mode.enabled = False
+        return cls._BLEND_MODES
 
     ## Mode options
 
