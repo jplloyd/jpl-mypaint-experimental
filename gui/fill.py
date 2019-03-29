@@ -22,6 +22,7 @@ import gui.cursor
 import gui.blendmodehandler
 
 import lib.floodfill
+import lib.mypaintlib
 
 
 ## Class defs
@@ -113,6 +114,8 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         If the current layer is not fillable, a new layer will always be
         created for the fill.
         """
+        if not self._fill_permitted:
+            return
         try:
             self.EOTF = self.app.preferences['display.colorspace_EOTF']
         except: 
@@ -134,6 +137,7 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
                            tolerance=opts.tolerance,
                            offset=opts.offset, feather=opts.feather,
                            gap_closing_options=opts.gap_closing_options,
+                           mode=self.bm.active_mode.mode_type,
                            sample_merged=opts.sample_merged,
                            make_new_layer=make_new_layer)
         opts.make_new_layer = False
@@ -165,10 +169,10 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         permitted = True
         if target_layer is not None:
             permitted = target_layer.visible and not target_layer.locked
-        if model.frame_enabled:
+        if permitted and model.frame_enabled:
             fx1, fy1, fw, fh = model.get_frame()
             fx2, fy2 = fx1+fw, fy1+fh
-            permitted &= x >= fx1 and y >= fy1 and x < fx2 and y < fy2
+            permitted = x >= fx1 and y >= fy1 and x < fx2 and y < fy2
         self._fill_permitted = permitted
 
         # Update cursor of any TDWs we've crossed
@@ -187,8 +191,12 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         """Get the (class singleton) blend modes manager"""
         cls = self.__class__
         if cls._BLEND_MODES is None:
-            cls._BLEND_MODES = gui.blendmodehandler.BlendModes()
-            cls._BLEND_MODES.colorize_mode.enabled = False
+            bm = gui.blendmodehandler.BlendModes()
+            bm.normal_mode.mode_type = lib.mypaintlib.CombineNormal
+            bm.eraser_mode.mode_type = lib.mypaintlib.CombineDestinationOut
+            bm.lock_alpha_mode.mode_type = lib.mypaintlib.CombineSourceAtop
+            bm.colorize_mode.enabled = False
+            cls._BLEND_MODES = bm
         return cls._BLEND_MODES
 
     ## Mode options
