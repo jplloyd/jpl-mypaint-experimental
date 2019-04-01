@@ -11,6 +11,7 @@
 import math
 import time
 import logging
+import sys
 
 import multiprocessing as mp
 import numpy as np
@@ -212,60 +213,70 @@ def morph(offset, tiles, full_opaque):
     cpus = mp.cpu_count()
     num_workers = int(min(cpus, math.sqrt((len(tiles) * se_size)) // 50))
 
-    if num_workers > 1:
-        # Use worker processes for large/heavy morphs
-        mt0 = time.time()
-
-        # Set up IPC communication channels and tile constants
-        strand_queue = mp.Queue()
-        morph_results = mp.Queue()
-
-        # Use int constants instead of tile references, since
-        # the references won't be the same for the workers
-        skip_tile = _EMPTY_TILE_PH if offset < 0 else _FULL_TILE_PH
-
-        # Create and start the worker processes
-        for _ in range(num_workers):
-            worker = mp.Process(
-                target=morph_worker,
-                args=(
-                    tiles, full_opaque, strand_queue,
-                    morph_results, offset, operation, skip_tile
-                )
+    # Try to use worker processes for large/heavy morphs
+    if num_workers > 1 and sys.platform != "win32":
+        try:
+            return morph_multi(
+                num_workers, offset, tiles, full_opaque, 
+                operation, strands, morphed
             )
-            worker.start()
+        except:
+            logger.warn("Multiprocessing failed, using single core fallback")
 
-        # Populate the work queue with strands
-        for strand in strands:
-            strand_queue.put(strand)
-        # Add a stop-signal value for each worker
-        for signal in (None,) * num_workers:
-            strand_queue.put(signal)
+    # Don't use workers for small workloads
+    mt1 = time.time()
+    skip_t = _EMPTY_TILE if offset < 0 else _FULL_TILE
+    for strand in strands:
+        morph_strand(
+            tiles, full_opaque, offset > 0,
+            myplib.MorphBucket(se_size), operation,
+            skip_t, _FULL_TILE, strand, morphed
+        )
+    logger.info("%.3f s. to morph without workers", time.time() - mt1)
+    return morphed
 
-        # Merge the resulting tile dicts, replacing proxy constants
-        # with their corresponding references for full/empty tiles
-        for _ in range(num_workers):
-            result = morph_results.get()
-            result_items = result.items() if PY3 else result.iteritems()
-            for tile_coord, tile in result_items:
-                morphed[tile_coord] = unproxy(tile)
 
-        logger.info(
-            "%.3f s. to morph with %d workers",
-            time.time() - mt0, num_workers)
-        return morphed
-    else:
-        # Don't use workers for small workloads
-        mt1 = time.time()
-        skip_t = _EMPTY_TILE if offset < 0 else _FULL_TILE
-        for strand in strands:
-            morph_strand(
-                tiles, full_opaque, offset > 0,
-                myplib.MorphBucket(se_size), operation,
-                skip_t, _FULL_TILE, strand, morphed
+def morph_multi(
+    num_workers, offset, tiles, full_opaque,
+    operation, strands, morphed
+):
+    """Set up worker processes and a work queue to
+    split up the morphological operations
+    """
+    mt0 = time.time()
+    # Set up IPC communication channels and tile constants
+    strand_queue = mp.Queue()
+    morph_results = mp.Queue()
+    # Use int constants instead of tile references, since
+    # the references won't be the same for the workers
+    skip_tile = _EMPTY_TILE_PH if offset < 0 else _FULL_TILE_PH
+    # Create and start the worker processes
+    for _ in range(num_workers):
+        worker = mp.Process(
+            target=morph_worker,
+            args=(
+                tiles, full_opaque, strand_queue,
+                morph_results, offset, operation, skip_tile
             )
-        logger.info("%.3f s. to morph without workers", time.time() - mt1)
-        return morphed
+        )
+        worker.start()
+    # Populate the work queue with strands
+    for strand in strands:
+        strand_queue.put(strand)
+    # Add a stop-signal value for each worker
+    for signal in (None,) * num_workers:
+        strand_queue.put(signal)
+    # Merge the resulting tile dicts, replacing proxy constants
+    # with their corresponding references for full/empty tiles
+    for _ in range(num_workers):
+        result = morph_results.get()
+        result_items = result.items() if PY3 else result.iteritems()
+        for tile_coord, tile in result_items:
+            morphed[tile_coord] = unproxy(tile)
+    logger.info(
+        "%.3f s. to morph with %d workers",
+        time.time() - mt0, num_workers)
+    return morphed
 
 
 def morph_strand(
@@ -531,7 +542,7 @@ def flood_fill(
     t1 = time.time()
     logger.info("%.3f seconds to fill", t1 - t0)
 
-    # Dilate/Erode, Grow/Contract, Expand/Shrink
+    # Dilate/Erode (Grow/Shrink)
     if offset != 0:
         filled = morph(offset, filled, full_opaque)
 
@@ -554,8 +565,7 @@ def composite(
         filled, bbox, bounds, dst):
     """Composite the filled tiles into the destination surface"""
 
-    # When filling large areas, copying a full tile directly
-    # (when possible) greatly improves performance.
+    # Prepare opaque color rgba tile for copying
     full_rgba = myplib.fill_rgba(
         _FULL_TILE, *(fill_col + (0, 0, N-1, N-1)))
 
