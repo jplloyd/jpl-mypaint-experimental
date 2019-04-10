@@ -23,5 +23,5 @@
 #include "colorchanger_crossed_bowl.hpp"
 #include "gdkpixbuf2numpy.hpp"
 #include "fastpng.hpp"
-#include "floodfill.hpp"
+#include "fill.hpp"
 #include "brushsettings.hpp"
