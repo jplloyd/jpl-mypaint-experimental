@@ -640,6 +640,7 @@ class PaintingModeOptionsWidgetBase (Gtk.Grid):
                 parent_value = parent_binf.get_base_value(cname)
                 adj = self.app.brush_adjustment[cname]
                 adj.set_value(parent_value)
+        app.brushmodifier.normal_mode.activate()
 
 
 class BrushworkModeMixin (InteractionMode):
