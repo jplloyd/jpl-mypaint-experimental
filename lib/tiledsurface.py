@@ -720,7 +720,7 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
         return _TiledSurfaceMove(self, x, y, sort=sort)
 
     def flood_fill(self, x, y, color, tolerance, offset, feather,
-                   gap_closing_options, mode, framed, bbox, dst_surface):
+                   gap_closing_options, framed, bbox, dst_surface):
         """Fills connected areas of this surface into another
 
         :param x: Starting point X coordinate
@@ -733,8 +733,6 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
         :type feather: int [0, TILE_SIZE]
         :param gap_closing_options: parameters for gap closing fill, or None
         :type gap_closing_options: lib.floodfill.GapClosingOptions
-        :param mode: Fill blend mode - normal, erasing, alpha locked
-        :type mode: int (Any of the Combine* modes in mypaintlib)
         :param framed: Whether the frame is enabled or not.
         :type framed: bool
         :param bbox: Bounding box: limits the fill
@@ -747,7 +745,7 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
         See also `lib.layer.Layer.flood_fill()` and `fill.flood_fill()`.
         """
         flood_fill(self, x, y, color, tolerance, offset, feather,
-                   gap_closing_options, mode, framed, bbox, dst_surface)
+                   gap_closing_options, framed, bbox, dst_surface)
 
     @contextlib.contextmanager
     def cairo_request(self, x, y, w, h, mode=lib.modes.DEFAULT_MODE):
@@ -1243,7 +1241,7 @@ class Background (Surface):
 
 
 def flood_fill(src, x, y, color, tolerance, offset, feather,
-               gap_closing_options, mode, framed, bbox, dst):
+               gap_closing_options, framed, bbox, dst):
     """Fills connected areas of one surface into another
 
     :param src: Source surface-like object
@@ -1260,8 +1258,6 @@ def flood_fill(src, x, y, color, tolerance, offset, feather,
     :type feather: int [0, TILE_SIZE]
     :param gap_closing_options: parameters for gap closing fill, or None
     :type gap_closing_options: lib.floodfill.GapClosingOptions
-    :param mode: Fill blend mode - normal, erasing, alpha locked
-    :type mode: int (Any of the Combine* modes in mypaintlib)
     :param framed: Whether the frame is enabled or not.
     :type framed: bool
     :param bbox: Bounding box: limits the fill
@@ -1272,10 +1268,9 @@ def flood_fill(src, x, y, color, tolerance, offset, feather,
     See also `lib.layer.Layer.flood_fill()`.
 
     """
-    lib.floodfill._EMPTY_RGBA = transparent_tile.rgba
     lib.floodfill.flood_fill(
         src, x, y, color, tolerance, offset, feather,
-        gap_closing_options, mode, framed, bbox, dst)
+        gap_closing_options, framed, bbox, dst, transparent_tile)
 
 
 class PNGFileUpdateTask (object):

@@ -61,8 +61,6 @@ class Name:
     REMOVE = "cursor_remove"
     ADD = "cursor_add"
     PICKER = "cursor_color_picker"
-    ERASER = "cursor_eraser"
-    ALPHA_LOCK = "cursor_alpha_lock"
 
 
 def get_brush_cursor(radius, style, prefs={}):
@@ -234,8 +232,6 @@ class CustomCursorMaker (object):
         Name.REMOVE: (11, 11),
         Name.ADD: (11, 11),
         Name.PICKER: (3, 15),
-        Name.ERASER: (11,11),
-        Name.ALPHA_LOCK: (11,11),
     }
 
     def __init__(self, app):
