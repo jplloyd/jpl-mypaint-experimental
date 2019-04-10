@@ -1268,10 +1268,9 @@ def flood_fill(src, x, y, color, tolerance, offset, feather,
     See also `lib.layer.Layer.flood_fill()`.
 
     """
-    lib.floodfill._EMPTY_RGBA = transparent_tile.rgba
     lib.floodfill.flood_fill(
         src, x, y, color, tolerance, offset, feather,
-        gap_closing_options, framed, bbox, dst)
+        gap_closing_options, framed, bbox, dst, transparent_tile)
 
 
 class PNGFileUpdateTask (object):
