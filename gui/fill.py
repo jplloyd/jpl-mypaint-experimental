@@ -14,6 +14,7 @@ from __future__ import division, print_function
 
 import weakref
 from gi.repository import Gtk
+from gi.repository import Gdk
 from gi.repository import Pango
 from gettext import gettext as _
 from lib.gettext import C_
@@ -111,6 +112,7 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         self.app = get_app()
         self.bm = self.get_blend_modes()
         self.bm.mode_changed += self.update_blendmode
+        self._prev_release = (0, None)
 
     def update_blendmode(self, bm, old, new):
         if(old is not new):
@@ -151,6 +153,19 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
                            make_new_layer=make_new_layer)
         opts.make_new_layer = False
         return False
+
+    def key_press_cb(self, win, tdw, event):
+        timeout = 500
+        t = event.time
+        (old_t, k) = self._prev_release
+        if t - old_t < timeout and k == event.keyval:
+            if k == Gdk.KEY_Shift_L:
+                self.get_options_widget().flip_gap_closing()
+            elif k == Gdk.KEY_Control_L:
+                self.get_options_widget().flip_use_src_layer()
+            self._update_ui()
+            t -= 500
+        self._prev_release = (t, event.keyval)
 
     def motion_notify_cb(self, tdw, event):
         """Track position, and update cursor"""
@@ -505,6 +520,29 @@ class FloodFillOptionsWidget (Gtk.Grid):
         align.add(button)
         self.attach(align, 0, row, 2, 1)
 
+    def flip_gap_closing(self):
+        """Turn gap closing on or off depending on its current status"""
+        self._gap_closing_toggle.set_active(not self.gap_closing)
+
+    def flip_use_src_layer(self):
+        """Flip between using the default src layer and previous choice"""
+        prev = self._prev_src_layer
+        if not (prev and prev() and prev().root):
+            return
+        index = self._layer_index(prev())
+        combo = self._src_combo
+        choice = 0 if combo.get_active() == index else index
+        with combo.handler_block(self._combo_cb_id):
+            combo.set_active(choice)
+
+    def _layer_index(self, layer):
+        """Linear fetch for layer index in src selection combobox
+        Returns None if the layer is not contained in any row.
+        """
+        for i, entry in enumerate(self._src_combo.get_model()):
+            if entry[2] is layer:
+                return i
+
     @property
     def tolerance(self):
         return float(self._tolerance_adj.get_value())
@@ -586,14 +624,12 @@ class FloodFillOptionsWidget (Gtk.Grid):
         """
         layer = root.deepget(path)
         if layer and self._prev_src_layer and self._prev_src_layer() is layer:
-            # Restore previous selection layer
+            # Restore previous layer selection
             combo = self._src_combo
-            for entry in combo.get_model():
-                if entry[2] is layer:
-                    # Don't trigger callback
-                    with combo.handler_block(self._combo_cb_id):
-                        combo.set_active_iter(entry.iter)
-                    return
+            index = self._layer_index(layer)
+            if index:
+                with combo.handler_block(self._combo_cb_id):
+                    combo.set_active(index)
 
     def _src_combo_changed_cb(self, combo):
         """Track the last selected choice of layer to maintain
