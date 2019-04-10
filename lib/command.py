@@ -509,15 +509,22 @@ class FloodFill (Command):
 
     display_name = _("Flood Fill")
 
-    def __init__(self, doc, x, y, color, bbox, tolerance,
-                 sample_merged, make_new_layer, **kwds):
+    def __init__(self, doc, x, y, color, tolerance, offset, feather,
+                 gap_closing_options, mode, bbox,
+                 sample_merged, src_path, make_new_layer, **kwds):
         super(FloodFill, self).__init__(doc, **kwds)
         self.x = x
         self.y = y
         self.color = color
-        self.bbox = bbox
         self.tolerance = tolerance
+        self.offset = offset
+        self.feather = feather
+        self.gap_closing_options = gap_closing_options
+        self.mode = mode
+        self.framed = doc.get_frame_enabled()
+        self.bbox = bbox
         self.sample_merged = sample_merged
+        self.src_path = src_path
         self.make_new_layer = make_new_layer
         self.new_layer = None
         self.new_layer_path = None
@@ -528,6 +535,8 @@ class FloodFill (Command):
         layers = self.doc.layer_stack
         if self.sample_merged:
             src_layer = layers
+        elif self.src_path is not None:
+            src_layer = layers.deepget(self.src_path)
         else:
             src_layer = layers.current
         # Choose a target
@@ -543,14 +552,20 @@ class FloodFill (Command):
             self.new_layer_path = path
             layers.set_current_path(path)
             dst_layer = nl
+            # For any other mode than normal, it makes
+            # no sense to perform the actual fill on a new layer
+            if self.mode != 0:
+                return
         else:
             # Overwrite current, but snapshot 1st
             assert self.snapshot is None
             self.snapshot = layers.current.save_snapshot()
             dst_layer = layers.current
         # Fill connected areas of the source into the destination
-        src_layer.flood_fill(self.x, self.y, self.color, self.bbox,
-                             self.tolerance, dst_layer=dst_layer)
+        fill_args = (self.x, self.y, self.color, self.tolerance,
+                     self.offset, self.feather, self.gap_closing_options,
+                     self.mode, self.framed, self.bbox)
+        src_layer.flood_fill(*fill_args, dst_layer=dst_layer)
 
     def undo(self):
         layers = self.doc.layer_stack
