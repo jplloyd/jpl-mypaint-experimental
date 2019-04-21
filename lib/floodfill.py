@@ -235,7 +235,7 @@ def flood_fill(
 
 def update_bbox(bbox, tx, ty):
     """Update given the min/max, x/y bounding box
-    If a coordinates lie outside of the current
+    If a coordinate lies outside of the current
     bounds, set the bounds based on that coordinate
     """
     if bbox:
