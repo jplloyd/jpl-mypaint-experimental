@@ -186,4 +186,6 @@ void find_gaps(
     PyObject *src_sw,
     PyObject *src_nw);
 
+void test_threading(int some_number);
+
 #endif
