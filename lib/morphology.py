@@ -114,6 +114,7 @@ def morph(offset, tiles):
     """ Either dilate or erode the given set of alpha tiles, depending
     on the sign of the offset, returning the set of morphed tiles.
     """
+    myplib.test_threading(42)
     operation = myplib.dilate if offset > 0 else myplib.erode
     # Radius of the structuring element used in the morph
     se_size = abs(offset)
