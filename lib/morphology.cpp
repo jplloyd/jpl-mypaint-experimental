@@ -8,6 +8,9 @@
  */
 #include "morphology.hpp"
 #include <cmath>
+#include <thread>
+#include <mutex>
+#include <future>
 
 #include <numpy/ndarraytypes.h>
 
@@ -161,7 +164,7 @@ void MorphBucket::populate_row(int y_row, int y_px)
         table[y_row][x][0] = input[y_px][x];
     }
     int prev_len = 1;
-    for(int len_i = 1; len_i < se_lengths.size(); len_i++) {
+    for(size_t len_i = 1; len_i < se_lengths.size(); len_i++) {
         const int len = se_lengths[len_i];
         const int len_diff = len - prev_len;
         prev_len = len;
@@ -200,7 +203,8 @@ bool MorphBucket::can_skip(PixelBuffer<chan_t> buf)
 {
     const int r = radius;
     const int max_search_radius = 15;
-    const int r_limit = (N * sqrt(2)) / 2;
+    // sqrt(2) approx = 1.41421356
+    constexpr int r_limit = ((float)N * 1.41421356) / 2;
 
     // Structuring element covers the entire tile
     if(r > r_limit) {
@@ -290,26 +294,24 @@ static PyObject* generic_morph(
     PyObject *sw, PyObject *nw)
 {
 
+    if (mb.can_skip<lim>(PixelBuffer<chan_t>(mid)))
+        return Py_BuildValue("(b())", false);
+    
     mb.initiate(can_update, mid,
                 n, e, s, w,
                 ne, se, sw, nw);
 
-    if (mb.can_skip<lim>(PixelBuffer<chan_t>(mid))) {
-        return Py_BuildValue("(b())", false);
-    }
-    else {
-        npy_intp dims[] = {N, N};
-        PyObject* dst_tile = PyArray_EMPTY(2, dims, NPY_USHORT, 0);
+    npy_intp dims[] = {N, N};
+    PyObject* dst_tile = PyArray_EMPTY(2, dims, NPY_USHORT, 0);
 
-        PixelBuffer<chan_t> dst_buf = PixelBuffer<chan_t> (dst_tile);
-        mb.morph<init, lim, cmp>(
-            can_update, dst_buf);
-        PyObject* result = Py_BuildValue("(bN)", true, dst_tile);
+    PixelBuffer<chan_t> dst_buf = PixelBuffer<chan_t> (dst_tile);
+    mb.morph<init, lim, cmp>(
+        can_update, dst_buf);
+    PyObject* result = Py_BuildValue("(bN)", true, dst_tile);
 #ifdef HEAVY_DEBUG
-        assert(dst_tile->ob_refcnt == 1);
+    assert(dst_tile->ob_refcnt == 1);
 #endif
-        return result;
-    }
+    return result;
 }
 
 inline chan_t max(chan_t a, chan_t b)
@@ -660,4 +662,159 @@ bool no_corner_gaps(
 
     // No crorner-crossing gaps possible
     return true;
+}
+
+
+int worker_heuristic(int offset, int num_tiles)
+{
+    int se_size = abs(offset);
+    return sqrt(num_tiles * se_size) / 50;
+}
+
+std::vector<PyObject*> nine_grid(PyObject *tile_coord, PyObject *tiles)
+{
+    const int offs_num = 9;
+    const int xoffs[] {0, 0, 1, 0, -1, 1, 1, -1, -1};
+    const int yoffs [] {0, -1, 0, 1, 0, -1, 1, 1, -1};
+
+    int x, y;
+    PyArg_ParseTuple(tile_coord, "ii", &x, &y);
+    std::vector<PyObject*> adj (offs_num);
+
+    for(int i = 0; i < offs_num; ++i)
+    {
+        int _x = x + xoffs[i];
+        int _y = y + yoffs[i];
+        PyObject * c = Py_BuildValue("ii", _x, _y);
+        PyObject *tile = PyDict_GetItem(tiles, c);
+        Py_DECREF(c);
+        if (tile)
+            adj[i] = tile;
+        else
+            adj[i] = TileConstants::TRANSPARENT_ALPHA_TILE();
+    }
+
+    return adj;
+}
+
+void morph_strand(
+    int offset,
+    PyObject *strand,
+    PyObject *tiles,
+    MorphBucket &bucket,
+    PyObject *morphed
+    )
+{
+
+    PyObject *skip_tile = offset > 0 ?
+        TileConstants::OPAQUE_ALPHA_TILE() :
+        TileConstants::TRANSPARENT_ALPHA_TILE();
+    auto op = offset > 0 ? dilate : erode;
+    Py_ssize_t num_strand_tiles = PyList_GET_SIZE(strand);
+    bool can_update = false;
+    for(Py_ssize_t i = 0; i < num_strand_tiles; ++i)
+    {
+        PyObject *tile_coord = PyList_GET_ITEM(strand, i);
+        printf("Before nine grid\n");
+        std::vector<PyObject*> ng = nine_grid(tile_coord, tiles);
+        printf("After nine grid\n");
+        PyObject* result = op(
+            bucket, can_update,
+           ng[0], ng[1], ng[2],
+           ng[3], ng[4], ng[5],
+           ng[6], ng[7], ng[8]);
+        printf("After morphing\n");
+
+        PyObject *res_tile;
+        PyArg_ParseTuple(result, "bO", &can_update, &res_tile);
+        if(can_update)
+        {
+            PyDict_SetItem(morphed, tile_coord, res_tile);
+        }
+        else
+        {
+            PyDict_SetItem(morphed, tile_coord, skip_tile);
+        }
+        Py_DECREF(result);
+    }
+}
+
+void morph_worker(int offset, PyObject *strands, PyObject *tiles,
+                  std::promise<PyObject*> promise,
+                  int &index, std::mutex &mut)
+{
+    PyObject *morphed = PyDict_New();
+    MorphBucket bucket (abs(offset));
+    Py_ssize_t num_strands = PyList_GET_SIZE(strands);
+    while(true)
+    {
+        int i;
+        mut.lock();
+        i = index++;
+        mut.unlock();
+        if(i >= num_strands)
+            break;
+        printf("Before fetching\n");
+        PyObject *strand = PyList_GET_ITEM(strands, i);
+        printf("After fetching\n");
+        morph_strand(offset, strand, tiles, bucket, morphed);
+        printf("After morphing\n");
+    }
+    promise.set_value(morphed);
+}
+
+void morph(
+    int offset, int num_strand_tiles,
+    PyObject *morphed,
+    PyObject *tiles, PyObject *strands)
+{
+    if (offset == 0 || offset > N || offset < -N ||
+        !PyDict_Check(tiles) || !PyList_CheckExact(strands))
+    {
+        printf("Invalid morph parameters!\n");
+        return;
+    }
+
+    int max_threads = std::thread::hardware_concurrency();
+    int num_desired = worker_heuristic(offset, num_strand_tiles);
+    int num_threads = MIN(num_desired, max_threads);
+    //num_threads = 1; // For now, let's make sure that the basics work without threads
+    if(num_threads > 1)
+    {
+        printf("Preparing to morph w. %d threads\n", num_threads);
+        std::vector<std::thread> threads (num_threads);
+        std::vector<std::future<PyObject*>> futures (num_threads);
+        std::mutex index_mut;
+        int strand_index = 0;
+        for(int i = 0; i < num_threads; ++i)
+        {
+            std::promise<PyObject*> promise;
+            futures[i] = promise.get_future();
+            threads[i] = std::thread(
+                morph_worker,
+                offset, strands, tiles,
+                std::move(promise),
+                std::ref(strand_index),
+                std::ref(index_mut)
+                );
+        }
+        for(int i = 0; i < num_threads; ++i)
+        {
+            futures[i].wait();
+            PyObject *_m = futures[i].get();
+            PyDict_Update(morphed, _m);
+            Py_DECREF(_m);
+            threads[i].join();
+        }
+    }
+    else
+    {
+        MorphBucket bucket (abs(offset));
+        Py_ssize_t num_strands = PyList_GET_SIZE(strands);
+        for (Py_ssize_t i = 0; i < num_strands; ++i)
+        {
+            PyObject *strand = PyList_GET_ITEM(strands, i);
+            morph_strand(offset, strand, tiles, bucket, morphed);
+        }
+    }
 }

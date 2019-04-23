@@ -186,4 +186,7 @@ void find_gaps(
     PyObject *src_sw,
     PyObject *src_nw);
 
+void morph(int offset, int num_strand_tiles,
+           PyObject *tiles, PyObject *strands, PyObject *morphed);
+
 #endif
