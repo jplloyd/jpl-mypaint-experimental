@@ -524,7 +524,6 @@ def get_ext_modules():
     import numpy
 
     extra_compile_args = [
-        '--std=c++11',
         '-Wall',
         '-Wno-sign-compare',
         '-Wno-write-strings',

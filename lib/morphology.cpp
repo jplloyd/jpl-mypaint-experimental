@@ -8,7 +8,6 @@
  */
 #include "morphology.hpp"
 #include <cmath>
-#include <thread>
 
 #include <numpy/ndarraytypes.h>
 
@@ -661,39 +660,4 @@ bool no_corner_gaps(
 
     // No crorner-crossing gaps possible
     return true;
-}
-
-
-int some_processing(int numberoo)
-{
-    int result = 0;
-    for(int i=0; i < numberoo; ++i)
-    {
-        result += numberoo % ((i+1) * 5);
-    }
-    printf("Done!\n");
-    return result;
-}
-
-void test_threading(int some_number)
-{
-    printf("We have received a number, we will process it...in parallell!");
-    printf("\nThe number is: %d\n", some_number);
-
-    int num_threads = std::thread::hardware_concurrency();
-    num_threads = num_threads > 6 ? 6 : num_threads;
-
-    std::vector<std::thread> threads {};
-    
-    printf("We start %d threads!\n", num_threads);
-
-    for(int n = 0; n < num_threads; ++n)
-    {
-        threads.push_back(std::thread(some_processing, 500));
-    }
-
-    for(int n = 0; n < num_threads; ++n)
-    {
-        threads[n].join();
-    }
 }
