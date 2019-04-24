@@ -71,11 +71,11 @@ public:
     bool can_skip(PixelBuffer<chan_t> buf);
     void initiate(
         bool can_update,
-        PyObject *src_mid,
-        PyObject *src_n, PyObject *src_e,
-        PyObject *src_s, PyObject *src_w,
-        PyObject *src_ne, PyObject *src_se,
-        PyObject *src_sw, PyObject *src_nw);
+        PixelBuffer<chan_t> &src_mid,
+        PixelBuffer<chan_t> &src_n, PixelBuffer<chan_t> &src_e,
+        PixelBuffer<chan_t> &src_s, PixelBuffer<chan_t> &src_w,
+        PixelBuffer<chan_t> &src_ne, PixelBuffer<chan_t> &src_se,
+        PixelBuffer<chan_t> &src_sw, PixelBuffer<chan_t> &src_nw);
 private:
     int radius; // structuring element radius
     int height; // structuring element height
@@ -85,23 +85,23 @@ private:
     chan_t **input; // input 2d array populated by 3x3 input tile grid
 };
 
-PyObject *dilate(
-    MorphBucket &mb,
-    bool can_update,
-    PyObject *src_mid,
-    PyObject *src_n, PyObject *src_e,
-    PyObject *src_s, PyObject *src_w,
-    PyObject *src_ne, PyObject *src_se,
-    PyObject *src_sw, PyObject *src_nw);
+// PyObject *dilate(
+//     MorphBucket &mb,
+//     bool can_update,
+//     PyObject *src_mid,
+//     PyObject *src_n, PyObject *src_e,
+//     PyObject *src_s, PyObject *src_w,
+//     PyObject *src_ne, PyObject *src_se,
+//     PyObject *src_sw, PyObject *src_nw);
 
-PyObject *erode(
-    MorphBucket &mb,
-    bool can_update,
-    PyObject *src_mid,
-    PyObject *src_n, PyObject *src_e,
-    PyObject *src_s, PyObject *src_w,
-    PyObject *src_ne, PyObject *src_se,
-    PyObject *src_sw, PyObject *src_nw);
+// PyObject *erode(
+//     MorphBucket &mb,
+//     bool can_update,
+//     PyObject *src_mid,
+//     PyObject *src_n, PyObject *src_e,
+//     PyObject *src_s, PyObject *src_w,
+//     PyObject *src_ne, PyObject *src_se,
+//     PyObject *src_sw, PyObject *src_nw);
 
 
 #ifdef SWIG
@@ -185,5 +185,8 @@ void find_gaps(
     PyObject *src_se,
     PyObject *src_sw,
     PyObject *src_nw);
+
+void morph(int offset, int num_strand_tiles,
+           PyObject *tiles, PyObject *strands, PyObject *morphed);
 
 #endif
