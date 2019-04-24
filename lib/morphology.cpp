@@ -783,15 +783,15 @@ void morph_worker(int offset, PyObject *strands, PyObject *tiles,
                   std::promise<PyObject*> promise,
                   int &index, std::mutex &mut)
 {
-    printf("Ready to start working!\n");
+    // printf("Ready to start working!\n");
     //PyEval_InitThreads();
     //printf("I could initthreads somehow\n");
     PyGILState_STATE gstate;
     gstate = PyGILState_Ensure();
-    printf("I could ensure thread access!\n");
+    // printf("I could ensure thread access!\n");
     PyObject *morphed = PyDict_New();
     Py_ssize_t num_strands = PyList_GET_SIZE(strands);
-    printf("Got the size\n");
+    // printf("Got the size\n");
     PyGILState_Release(gstate);
     MorphBucket bucket (abs(offset));
     while(true)
@@ -803,13 +803,11 @@ void morph_worker(int offset, PyObject *strands, PyObject *tiles,
         if(i >= num_strands)
             break;
         gstate = PyGILState_Ensure();
-        printf("Getting the item\n");
         PyObject *strand = PyList_GET_ITEM(strands, i);
         PyGILState_Release(gstate);
         morph_strand(offset, strand, tiles, bucket, morphed);
-        printf("Morphed!\n");
     }
-    printf("Job's done!\n");
+    // printf("Job's done!\n");
     promise.set_value(morphed);
 }
 
@@ -825,24 +823,24 @@ void morph(
         return;
     }
 
-    printf("Input params\n");
-    printf("Morphed dict address: %p\n", morphed);
-    printf("Morphed dict length: %lu\n", PyDict_Size(morphed));
+    // printf("Input params\n");
+    // printf("Morphed dict address: %p\n", morphed);
+    // printf("Morphed dict length: %lu\n", PyDict_Size(morphed));
     
     int max_threads = std::thread::hardware_concurrency();
     int num_desired = worker_heuristic(offset, num_strand_tiles);
     int num_threads = MIN(num_desired, max_threads);
-    num_threads = 1; // For now, let's make sure that the basics work without threads
-    if(num_threads == 1)
+    // num_threads = 1; // For now, let's make sure that the basics work without threads
+    if(num_threads > 1)
     {
         printf("Preparing to morph w. %d threads\n", num_threads);
         std::vector<std::thread> threads (num_threads);
         std::vector<std::future<PyObject*>> futures (num_threads);
         std::mutex index_mut;
-        PyGILState_STATE state;
-        state = PyGILState_Ensure();
+        //PyGILState_STATE state;
+        //state = PyGILState_Ensure();
         PyEval_InitThreads();
-        printf("Reach this point\n");
+        // printf("Reach this point\n");
         int strand_index = 0;
         for(int i = 0; i < num_threads; ++i)
         {
@@ -857,26 +855,23 @@ void morph(
                 );
         }
 
-        PyGILState_Release(state);
+        //PyGILState_Release(state);
+        Py_BEGIN_ALLOW_THREADS
         
-        
-        printf("Reach this point too\n");
+        // printf("Reach this point too\n");
         for(int i = 0; i < num_threads; ++i)
         {
             futures[i].wait();
             PyObject *_m = futures[i].get();
             PyGILState_STATE state;
             state = PyGILState_Ensure();
-            printf("Updating 1\n");
             PyDict_Update(morphed, _m);
-            printf("Updating 2\n");
             Py_DECREF(_m);
-            printf("Updating 3\n");
             PyGILState_Release(state);
-            printf("Updating 4\n");
             threads[i].join();
-            printf("Thread joined\n");
         }
+        
+        Py_END_ALLOW_THREADS
     }
     else
     {
@@ -888,10 +883,10 @@ void morph(
             morph_strand(offset, strand, tiles, bucket, morphed);
         }
     }
-    printf("Diagnostics:");
-    printf("Morphed dict address: %p\n", morphed);
-    Py_ssize_t dlen = PyDict_Size(morphed);
-    printf("Morphed dict length: %lu\n", dlen);
+    // printf("Diagnostics:");
+    // printf("Morphed dict address: %p\n", morphed);
+    // Py_ssize_t dlen = PyDict_Size(morphed);
+    // printf("Morphed dict length: %lu\n", dlen);
 
     // dlen = 0;
     // PyObject *key;
@@ -905,5 +900,5 @@ void morph(
     //     printf("key is tuple: %d, val is PyArray: %d\n", PyTuple_Check(key), PyArray_Check(val));
     // }
     
-    printf("Time to say goodbye!\n");
+    // printf("Time to say goodbye!\n");
 }

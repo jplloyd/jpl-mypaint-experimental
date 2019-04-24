@@ -147,15 +147,7 @@ def morph(offset, tiles):
     # Split up the coordinates of the tiles to morphed into
     # contiguous strands, which can be processed more efficiently
     morphed, strands, num_strand_tiles = tile_partition(tiles)
-
-    print("Prior to call")
     myplib.morph(offset, num_strand_tiles, morphed, tiles, strands)
-    print("After call")
-    if morphed:
-        print("Back here again, morphed is not none!")
-        print("Length of dict: ", len(morphed))
-    else:
-        print("Morphed is somehow None!")
 
     return morphed
 
