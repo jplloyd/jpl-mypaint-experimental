@@ -136,9 +136,9 @@ def morph(offset, tiles):
     """ Either dilate or erode the given set of alpha tiles, depending
     on the sign of the offset, returning the set of morphed tiles.
     """
-    operation = myplib.dilate if offset > 0 else myplib.erode
+    # operation = myplib.dilate if offset > 0 else myplib.erode
     # Radius of the structuring element used in the morph
-    se_size = abs(offset)
+    # se_size = abs(offset)
     # When dilating, create new tiles to account for edge overflow
     # (without checking if they are actually needed)
     if offset > 0:
@@ -148,35 +148,43 @@ def morph(offset, tiles):
     # contiguous strands, which can be processed more efficiently
     morphed, strands, num_strand_tiles = tile_partition(tiles)
 
+    print("Prior to call")
     myplib.morph(offset, num_strand_tiles, morphed, tiles, strands)
+    print("After call")
+    if morphed:
+        print("Back here again, morphed is not none!")
+        print("Length of dict: ", len(morphed))
+    else:
+        print("Morphed is somehow None!")
+
     return morphed
 
     # Use a rough heuristic based on the number of tiles that need
     # processing and the size of the erosion/dilation
-    cpus = mp.cpu_count()
-    wanted_num_workers = int(math.sqrt(2*num_strand_tiles * se_size) // 50)
-    num_workers = min(cpus, wanted_num_workers)
+    # cpus = mp.cpu_count()
+    # wanted_num_workers = int(math.sqrt(2*num_strand_tiles * se_size) // 50)
+    # num_workers = min(cpus, wanted_num_workers)
 
-    # Try to use worker processes for large/heavy morphs
-    if False and num_workers > 1 and sys.platform != "win32":
-        try:
-            return morph_multi(
-                num_workers, offset, tiles,
-                operation, strands, morphed
-            )
-        except Exception:
-            logger.warn("Multiprocessing failed, using single core fallback")
+    # # Try to use worker processes for large/heavy morphs
+    # if False and num_workers > 1 and sys.platform != "win32":
+    #     try:
+    #         return morph_multi(
+    #             num_workers, offset, tiles,
+    #             operation, strands, morphed
+    #         )
+    #     except Exception:
+    #         logger.warn("Multiprocessing failed, using single core fallback")
 
-    # Don't use workers for small workloads
-    skip_t = _EMPTY_TILE if offset < 0 else _FULL_TILE
-    bucket = myplib.MorphBucket(se_size)
-    for strand in strands:
-        morph_strand(
-            tiles, offset > 0,
-            bucket, operation,
-            skip_t, _FULL_TILE, strand, morphed
-        )
-    return morphed
+    # # Don't use workers for small workloads
+    # skip_t = _EMPTY_TILE if offset < 0 else _FULL_TILE
+    # bucket = myplib.MorphBucket(se_size)
+    # for strand in strands:
+    #     morph_strand(
+    #         tiles, offset > 0,
+    #         bucket, operation,
+    #         skip_t, _FULL_TILE, strand, morphed
+    #     )
+    # return morphed
 
 
 def morph_multi(
