@@ -19,7 +19,7 @@
   buffer to the full input array.
 */
 template <typename T>
-static void fill_input_section(
+static void init_rect(
     const int x, const int w,
     const int y, const int h,
     PixelBuffer<T> input_buf, T **input,
@@ -37,22 +37,13 @@ static void fill_input_section(
 }
 
 template <typename T> // The type of value morphed
-static void copy_nine_grid_section(
+static void init_from_nine_grid(
     int radius, T **input, bool from_above,
     GridVector grid)
 {
     const int r = radius;
-
-    auto m = grid[0];
-    auto n = grid[1];
-    auto e = grid[2];
-    auto s = grid[3];
-    auto w = grid[4];
-    auto ne = grid[5];
-    auto se = grid[6];
-    auto sw = grid[7];
-    auto nw = grid[8];
-
+    #define B (N-r)
+    #define E (N+r)
     if(from_above) {
         // Reuse radius*2 rows from previous morph
         // and no need to handle the topmost tiles
@@ -60,25 +51,25 @@ static void copy_nine_grid_section(
             T *tmp = input[i];
             input[i] = input[N+i];
             input[N+i] = tmp;
-        } // west, mid, east - partial
-        fill_input_section<T>(0, r, 2*r, N-r, w, input, N-r, r);
-        fill_input_section<T>(r, N, 2*r, N-r, m, input, 0, r);
-        fill_input_section<T>(N+r, r, 2*r, N-r, e, input, 0, r);
+        } // west, mid, east: bottom (N-r) rows
+        init_rect<T>(0, r, 2*r, B, grid[4], input, B, r);
+        init_rect<T>(r, N, 2*r, B, grid[0], input, 0, r);
+        init_rect<T>(E, r, 2*r, B, grid[2], input, 0, r);
     }
     else { // nw, north, ne
-        fill_input_section<T>(0, r, 0, r, nw, input, N-r, N-r);
-        fill_input_section<T>(r, N, 0, r, n, input, 0, N-r);
-        fill_input_section<T>(N+r, r, 0, r, ne, input, 0, N-r);
+        init_rect<T>(0, r, 0, r, grid[8], input, B, B);
+        init_rect<T>(r, N, 0, r, grid[1], input, 0, B);
+        init_rect<T>(E, r, 0, r, grid[5], input, 0, B);
 
         // west, mid, east
-        fill_input_section<T>(0, r, r, N, w, input, N-r, 0);
-        fill_input_section<T>(r, N, r, N, m, input, 0, 0);
-        fill_input_section<T>(N+r, r, r, N, e, input, 0, 0);
+        init_rect<T>(0, r, r, N, grid[4], input, B, 0);
+        init_rect<T>(r, N, r, N, grid[0], input, 0, 0);
+        init_rect<T>(E, r, r, N, grid[2], input, 0, 0);
     }
     // sw, south, se
-    fill_input_section<T>(0, r, N+r, r, sw, input, N-r, 0);
-    fill_input_section<T>(r, N, N+r, r, s, input, 0, 0);
-    fill_input_section<T>(N+r, r, N+r, r, se, input, 0, 0);
+    init_rect<T>(0, r, E, r, grid[7], input, B, 0);
+    init_rect<T>(r, N, E, r, grid[3], input, 0, 0);
+    init_rect<T>(E, r, E, r, grid[6], input, 0, 0);
 }
 
 
@@ -275,7 +266,7 @@ void MorphBucket::morph(bool can_update, PixelBuffer<chan_t> &dst)
 void
 MorphBucket::initiate(bool can_update, GridVector grid)
 {
-    copy_nine_grid_section(radius, input, can_update, grid);
+    init_from_nine_grid(radius, input, can_update, grid);
 }
 
 template <chan_t init, chan_t lim, op cmp>
@@ -657,7 +648,7 @@ PyObject* BlurBucket::blur(bool can_update, GridVector input_grid)
 
 void BlurBucket::initiate(bool can_update, GridVector input)
 {
-    copy_nine_grid_section(radius, input_full, can_update, input);
+    init_from_nine_grid(radius, input_full, can_update, input);
 }
 
 bool BlurBucket::input_fully_opaque()
@@ -923,7 +914,7 @@ void find_gaps(
         PBT(ne), PBT(se), PBT(sw), PBT(nw)
     };
 
-    copy_nine_grid_section(r, rb.input, false, input);
+    init_from_nine_grid(r, rb.input, false, input);
 
     PixelBuffer<chan_t> radiuses (radiuses_arr);
     // search for gaps in an approximate semi-circle
