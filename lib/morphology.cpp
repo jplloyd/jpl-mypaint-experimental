@@ -42,8 +42,10 @@ static void init_from_nine_grid(
     GridVector grid)
 {
     const int r = radius;
-    #define B (N-r)
-    #define E (N+r)
+
+// Using macro here to avoid performance hit on gcc <= 5.4
+#define B (N-r)
+#define E (N+r)
     if(from_above) {
         // Reuse radius*2 rows from previous morph
         // and no need to handle the topmost tiles
@@ -52,24 +54,27 @@ static void init_from_nine_grid(
             input[i] = input[N+i];
             input[N+i] = tmp;
         } // west, mid, east: bottom (N-r) rows
-        init_rect<T>(0, r, 2*r, B, grid[4], input, B, r);
-        init_rect<T>(r, N, 2*r, B, grid[0], input, 0, r);
-        init_rect<T>(E, r, 2*r, B, grid[2], input, 0, r);
+        init_rect<T>(0, r, 2*r, B, grid[3], input, B, r);
+        init_rect<T>(r, N, 2*r, B, grid[4], input, 0, r);
+        init_rect<T>(E, r, 2*r, B, grid[5], input, 0, r);
     }
     else { // nw, north, ne
-        init_rect<T>(0, r, 0, r, grid[8], input, B, B);
+        init_rect<T>(0, r, 0, r, grid[0], input, B, B);
         init_rect<T>(r, N, 0, r, grid[1], input, 0, B);
-        init_rect<T>(E, r, 0, r, grid[5], input, 0, B);
+        init_rect<T>(E, r, 0, r, grid[2], input, 0, B);
 
         // west, mid, east
-        init_rect<T>(0, r, r, N, grid[4], input, B, 0);
-        init_rect<T>(r, N, r, N, grid[0], input, 0, 0);
-        init_rect<T>(E, r, r, N, grid[2], input, 0, 0);
+        init_rect<T>(0, r, r, N, grid[3], input, B, 0);
+        init_rect<T>(r, N, r, N, grid[4], input, 0, 0);
+        init_rect<T>(E, r, r, N, grid[5], input, 0, 0);
     }
     // sw, south, se
-    init_rect<T>(0, r, E, r, grid[7], input, B, 0);
-    init_rect<T>(r, N, E, r, grid[3], input, 0, 0);
-    init_rect<T>(E, r, E, r, grid[6], input, 0, 0);
+    init_rect<T>(0, r, E, r, grid[6], input, B, 0);
+    init_rect<T>(r, N, E, r, grid[7], input, 0, 0);
+    init_rect<T>(E, r, E, r, grid[8], input, 0, 0);
+
+#undef B
+#undef E
 }
 
 
@@ -277,7 +282,7 @@ generic_morph(
 {
     PyGILState_STATE gstate;
 
-    if (mb.can_skip<lim>(input[0])) {
+    if (mb.can_skip<lim>(input[4])) {
         PyObject *skip_tile;
         if (lim == 0)
             skip_tile = TileConstants::TRANSPARENT_ALPHA_TILE();
@@ -333,16 +338,15 @@ erode(
 // For the given tile coordinate, return a vector of pixel buffers for
 // the tiles of the coordinate and its 8 neighbours. If a neighbouring
 // tile does not exist, the empty alpha tile takes its place.
-// Order of tiles in vector, where 0 is the input tile:
-// 8 1 5
-// 4 0 2
-// 7 3 6
+// Order of tiles in vector, where 4 is the input tile:
+// 0 1 2
+// 3 4 5
+// 6 7 8
 GridVector
 nine_grid(PyObject *tile_coord, PyObject *tiles)
 {
-    const int offs_num = 9;
-    const int xoffs[] {0, 0, 1, 0, -1, 1, 1, -1, -1};
-    const int yoffs [] {0, -1, 0, 1, 0, -1, 1, 1, -1};
+    const int num_tiles = 9;
+    const int offs[] {-1, 0, 1};
 
     int x, y;
 
@@ -352,10 +356,10 @@ nine_grid(PyObject *tile_coord, PyObject *tiles)
     PyArg_ParseTuple(tile_coord, "ii", &x, &y);
     std::vector<PixelBuffer<chan_t>> grid;
 
-    for(int i = 0; i < offs_num; ++i)
+    for(int i = 0; i < num_tiles; ++i)
     {
-        int _x = x + xoffs[i];
-        int _y = y + yoffs[i];
+        int _x = x + offs[i%3];
+        int _y = y + offs[i/3];
         PyObject * c = Py_BuildValue("ii", _x, _y);
         PyObject *tile = PyDict_GetItem(tiles, c);
         Py_DECREF(c);
@@ -408,7 +412,7 @@ morph_strand(
         can_update = result.first;
 
         // Add morphed tile unless it is completely transparent
-        if(!empty_result(offset, grid[0], result.second))
+        if(!empty_result(offset, grid[4], result.second))
         {
             gstate = PyGILState_Ensure();
             PyDict_SetItem(morphed, tile_coord, result.second.array_ob);
@@ -910,8 +914,9 @@ void find_gaps(
 
     typedef PixelBuffer<chan_t> PBT;
     GridVector input {
-        PBT(mid), PBT(n), PBT(e), PBT(s), PBT(w),
-        PBT(ne), PBT(se), PBT(sw), PBT(nw)
+        PBT(nw), PBT(n), PBT(ne),
+        PBT(w), PBT(mid), PBT(e),
+        PBT(se), PBT(s), PBT(sw)
     };
 
     init_from_nine_grid(r, rb.input, false, input);
