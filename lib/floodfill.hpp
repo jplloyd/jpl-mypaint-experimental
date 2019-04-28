@@ -42,6 +42,18 @@
 #define DFF(a,b) (a) > (b) ? ((a)-(b)) : ((b)-(a))
 
 
+class TileConstants
+{
+public:
+    static PyObject *OPAQUE_ALPHA_TILE();
+    static PyObject *TRANSPARENT_ALPHA_TILE();
+private:
+    static void init();
+    static PyObject* _FULL_TILE;
+    static PyObject* _EMPTY_TILE;
+};
+
+
 typedef fix15_short_t chan_t;
 
 
@@ -162,6 +174,8 @@ template <typename C>
 class PixelBuffer
 {
 public:
+    PyObject* array_ob;
+
     explicit PixelBuffer(PyObject *buf)
         {
             PyArrayObject* arr_buf = (PyArrayObject*) buf;
@@ -175,6 +189,7 @@ public:
             assert(PyArray_ISALIGNED(arr_buf));
             assert(PyArray_IS_C_CONTIGUOUS(arr_buf));
 #endif
+            this->array_ob = buf;
             this->x_stride = PyArray_STRIDE(arr_buf, 1) / sizeof(C);
             this->y_stride = PyArray_STRIDE(arr_buf, 0) / sizeof(C);
             this->buffer = reinterpret_cast<C*>(PyArray_BYTES(arr_buf));

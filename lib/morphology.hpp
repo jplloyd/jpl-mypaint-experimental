@@ -37,12 +37,12 @@ struct chord
 
 // Only create wrappers for the bucket constructor
 #ifdef SWIG
-%ignore MorphBucket::rotate_lut();
-%ignore MorphBucket::initiate;
+%ignore MorphBucket;
 #endif
 
 // Comparison operation type used to template dilation/erosion
 typedef chan_t op(chan_t, chan_t);
+typedef std::vector<PixelBuffer<chan_t>> GridVector;
 
 /*
   Initiates and stores data shared between tile morph operations
@@ -69,13 +69,7 @@ public:
     void morph(bool can_update, PixelBuffer<chan_t>& dst);
     template <chan_t lim>
     bool can_skip(PixelBuffer<chan_t> buf);
-    void initiate(
-        bool can_update,
-        PyObject *src_mid,
-        PyObject *src_n, PyObject *src_e,
-        PyObject *src_s, PyObject *src_w,
-        PyObject *src_ne, PyObject *src_se,
-        PyObject *src_sw, PyObject *src_nw);
+    void initiate(bool can_update, GridVector input);
 private:
     int radius; // structuring element radius
     int height; // structuring element height
@@ -85,28 +79,20 @@ private:
     chan_t **input; // input 2d array populated by 3x3 input tile grid
 };
 
-PyObject *dilate(
-    MorphBucket &mb,
-    bool can_update,
-    PyObject *src_mid,
-    PyObject *src_n, PyObject *src_e,
-    PyObject *src_s, PyObject *src_w,
-    PyObject *src_ne, PyObject *src_se,
-    PyObject *src_sw, PyObject *src_nw);
-
-PyObject *erode(
-    MorphBucket &mb,
-    bool can_update,
-    PyObject *src_mid,
-    PyObject *src_n, PyObject *src_e,
-    PyObject *src_s, PyObject *src_w,
-    PyObject *src_ne, PyObject *src_se,
-    PyObject *src_sw, PyObject *src_nw);
+// Perform a dilation or erosion using the given input tiles
+// and strands of vertically contiguous coordinates, placing
+// the result in the given coord->tile dictionary.
+void
+morph(int offset, // Radius to grow (if > 0) or shrink (if < 0)
+      PyObject *morphed, // Dictionary holding the result of the operation
+      PyObject *tiles, // Input tiles, NxNx1 uint16 numpy arrays
+      PyObject *strands // Strands of contiguous tile coordinates
+    );
 
 
 #ifdef SWIG
+%ignore BlurBucket::factors;
 %ignore BlurBucket::radius;
-%ignore BlurBucket::height;
 %ignore BlurBucket::input_full;
 %ignore BlurBucket::input_vert;
 %ignore BlurBucket::output;
@@ -122,24 +108,25 @@ class BlurBucket
 public:
     explicit BlurBucket(int radius);
     ~BlurBucket();
+    PyObject* blur(bool can_update, GridVector input);
+private:
+    void initiate(bool can_update, GridVector input);
+    bool input_fully_opaque();
+    bool input_fully_transparent();
+    const std::vector<fix15_short_t> factors;
     const int radius;
-    const int height;
     chan_t **input_full;
     chan_t **input_vert;
     chan_t output[N][N];
 };
 
-/*
-  Performs a simple box blur on the source tile, outputting
-  the blurred alphas to the destination tile.
-*/
-void blur(BlurBucket &bb, bool can_update,
-          PyObject *src_mid, PyObject* dst_tile,
-          PyObject *src_n, PyObject *src_e,
-          PyObject *src_s, PyObject *src_w,
-          PyObject *src_ne, PyObject *src_se,
-          PyObject *src_sw, PyObject *src_nw);
 
+void
+blur(int radius, // Radius to grow (if > 0) or shrink (if < 0)
+     PyObject *blurred, // Dictionary holding the result of the operation
+     PyObject *tiles, // Input tiles, NxNx1 uint16 numpy arrays
+     PyObject *strands // Strands of contiguous tile coordinates
+    );
 
 // Gapclosing fill data utilities
 
