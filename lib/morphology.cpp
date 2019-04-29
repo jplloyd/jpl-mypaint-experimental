@@ -219,9 +219,9 @@ generic_morph(
     if (mb.can_skip<lim>(input[4])) {
         PyObject *skip_tile;
         if (lim == 0)
-            skip_tile = TileConstants::TRANSPARENT_ALPHA_TILE();
+            skip_tile = ConstTiles::ALPHA_TRANSPARENT();
         else
-            skip_tile = TileConstants::OPAQUE_ALPHA_TILE();
+            skip_tile = ConstTiles::ALPHA_OPAQUE();
         gstate = PyGILState_Ensure();
         auto skip_buf = PixelBuffer<chan_t>(skip_tile);
         PyGILState_Release(gstate);
@@ -300,7 +300,7 @@ nine_grid(PyObject *tile_coord, PyObject *tiles)
         if (tile)
             grid.push_back(PixelBuffer<chan_t>(tile));
         else
-            grid.push_back(PixelBuffer<chan_t>(TileConstants::TRANSPARENT_ALPHA_TILE()));
+            grid.push_back(PixelBuffer<chan_t>(ConstTiles::ALPHA_TRANSPARENT()));
     }
     PyGILState_Release(gstate);
 
@@ -311,7 +311,7 @@ nine_grid(PyObject *tile_coord, PyObject *tiles)
 bool
 empty_result(int offset, PixelBuffer<chan_t> src_buf, PixelBuffer<chan_t> result_buf)
 {
-    auto t_tile = TileConstants::TRANSPARENT_ALPHA_TILE();
+    auto t_tile = ConstTiles::ALPHA_TRANSPARENT();
     if(result_buf.array_ob == t_tile)
         return true;
     if(offset > 0 && src_buf.array_ob != t_tile)
@@ -526,10 +526,10 @@ PyObject* BlurBucket::blur(bool can_update, GridVector input_grid)
     initiate(can_update, input_grid);
 
     if(input_fully_opaque())
-        return TileConstants::OPAQUE_ALPHA_TILE();
+        return ConstTiles::ALPHA_OPAQUE();
 
     if(input_fully_transparent())
-        return TileConstants::TRANSPARENT_ALPHA_TILE();
+        return ConstTiles::ALPHA_TRANSPARENT();
 
     int r = radius;
 
@@ -631,7 +631,7 @@ blur_strand(
         can_update = true;
 
         // Add morphed tile unless it is completely transparent
-        if(result != TileConstants::TRANSPARENT_ALPHA_TILE())
+        if(result != ConstTiles::ALPHA_TRANSPARENT())
         {
             gstate = PyGILState_Ensure();
             PyDict_SetItem(blurred, tile_coord, result);

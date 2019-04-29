@@ -39,15 +39,15 @@
 // channel type: chan_t, used for color and alpha channels
 typedef fix15_short_t chan_t;
 
-class TileConstants
+class ConstTiles
 {
 public:
-    static PyObject *OPAQUE_ALPHA_TILE();
-    static PyObject *TRANSPARENT_ALPHA_TILE();
+    static PyObject *ALPHA_OPAQUE();
+    static PyObject *ALPHA_TRANSPARENT();
 private:
     static void init();
-    static PyObject* _FULL_TILE;
-    static PyObject* _EMPTY_TILE;
+    static PyObject *_ALPHA_OPAQUE;
+    static PyObject *_ALPHA_TRANSPARENT;
 };
 
 struct coord {

@@ -9,10 +9,10 @@
 
 #include "fill_common.hpp"
 
-PyObject* TileConstants::_EMPTY_TILE = nullptr;
-PyObject* TileConstants::_FULL_TILE = nullptr;
+PyObject* ConstTiles::_ALPHA_TRANSPARENT= nullptr;
+PyObject* ConstTiles::_ALPHA_OPAQUE = nullptr;
 
-void TileConstants::init()
+void ConstTiles::init()
 {
     npy_intp dims[] = {N, N};
     PyObject* empty = PyArray_ZEROS(2, dims, NPY_USHORT, false);
@@ -23,23 +23,22 @@ void TileConstants::init()
     {
         ref.write(fix15_one);
     }
-
-    _EMPTY_TILE = empty;
-    _FULL_TILE = full;
+    _ALPHA_TRANSPARENT = empty;
+    _ALPHA_OPAQUE = full;
 }
 
-PyObject* TileConstants::TRANSPARENT_ALPHA_TILE()
+PyObject* ConstTiles::ALPHA_TRANSPARENT()
 {
-    if(_EMPTY_TILE == nullptr)
+    if(!_ALPHA_TRANSPARENT)
         init();
-    return _EMPTY_TILE;
+    return _ALPHA_TRANSPARENT;
 }
 
-PyObject* TileConstants::OPAQUE_ALPHA_TILE()
+PyObject* ConstTiles::ALPHA_OPAQUE()
 {
-    if(_FULL_TILE == nullptr)
+    if(!_ALPHA_OPAQUE)
         init();
-    return _FULL_TILE;
+    return _ALPHA_OPAQUE;
 }
 
 PyObject* fill_rgba(
