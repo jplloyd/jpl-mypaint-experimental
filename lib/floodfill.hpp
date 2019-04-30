@@ -16,7 +16,7 @@
 #include "fill_common.hpp"
 
 // Largest squared gap distance - represents infinite radius
-#define MAX_GAP 2*N*N
+#define MAX_GAP (2*N*N)
 
 // Enumeration of tile edges - used to determine seed range
 // direction of origin, wrapped in a struct for SWIG's sake

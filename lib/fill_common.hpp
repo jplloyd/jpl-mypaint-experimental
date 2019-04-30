@@ -23,7 +23,6 @@
 #include <numpy/ndarraytypes.h>
 
 #define N MYPAINT_TILE_SIZE
-#define TILE_SQUARED N * N
 
 #ifndef MIN
 #define MIN(a,b) (a) < (b) ? (a) : (b)
@@ -182,7 +181,7 @@ public:
             PixelRef<C> px = get_pixel(0,0);
             C first = px.read();
             px.move_x(1);
-            for(int i = 1; i < TILE_SQUARED; i++, px.move_x(1))
+            for(int i = 1; i < (N*N); i++, px.move_x(1))
                 if(first != px.read())
                     return false;
             return true;
