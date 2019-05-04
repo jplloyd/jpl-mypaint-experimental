@@ -30,8 +30,12 @@ typedef struct { int x, y, w, h; } Rect;
 %include "colorchanger_wash.hpp"
 %include "colorchanger_crossed_bowl.hpp"
 %include "fastpng.hpp"
+
+%include "fill_constants.hpp"
 %include "floodfill.hpp"
-%include "morphology.hpp"
+%include "gap_detection.hpp"
+%include "morphology_swig.hpp"
+%include "blur_swig.hpp"
 %include "brushsettings.hpp"
 
 %include "gdkpixbuf2numpy.hpp"
