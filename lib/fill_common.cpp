@@ -106,7 +106,7 @@ num_strand_workers(int num_strands, int min_strands_per_worker)
 {
     int max_threads = std::thread::hardware_concurrency();
     int max_by_strands = num_strands / min_strands_per_worker;
-    return MIN(max_threads, max_by_strands);
+    return MAX(1, MIN(max_threads, max_by_strands));
 }
 
 void
