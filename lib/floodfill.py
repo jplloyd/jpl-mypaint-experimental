@@ -274,9 +274,6 @@ def composite(mode, fill_col, trim_result, filled, outer_bbox, dst):
         # Note:filled tiles outside bbox only originates from dilation/blur
         if trim_result and out_of_bounds(tile_coord, tiles_bbox):
             continue
-        # Skip empty source tiles (no fill to process)
-        if src_tile is _EMPTY_TILE:
-            continue
 
         # Skip empty destination tiles for erasing and alpha locking
         # Avoids completely unnecessary tile allocation and copying
@@ -430,7 +427,6 @@ class _TileFillSkipper:
         # cannot be filled at all (unlikely, but not impossible)
         self.final.add(tile_coord)
         if alpha == 0:
-            filled[tile_coord] = _EMPTY_TILE
             return [(), (), (), ()]
         elif alpha == _OPAQUE:
             filled[tile_coord] = _FULL_TILE
@@ -561,6 +557,10 @@ def prep_alphas(tile_coord, full_alphas, src, filler):
                 alpha = filler.tile_uniformity(is_empty, src_tile)
                 if alpha == _OPAQUE:
                     full_alphas[ntc] = _FULL_TILE
+                elif alpha == 0:
+                    full_alphas[ntc] = _EMPTY_TILE
+                elif alpha:
+                    full_alphas[ntc] = np.full((N, N), alpha, 'uint16')
                 else:
                     alpha_tile = np.empty((N, N), 'uint16')
                     filler.flood(src_tile, alpha_tile)

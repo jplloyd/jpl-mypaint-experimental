@@ -10,6 +10,60 @@
 #include "fill_common.hpp"
 #include "fill_constants.hpp"
 
+AtomicDict::AtomicDict()
+{
+    PyGILState_STATE s = PyGILState_Ensure();
+    dict = PyDict_New();
+    PyGILState_Release(s);
+}
+
+AtomicDict::AtomicDict(PyObject* d) : dict(d)
+{
+    PyGILState_STATE s = PyGILState_Ensure();
+    Py_INCREF(dict);
+    PyGILState_Release(s);
+}
+
+AtomicDict::AtomicDict(const AtomicDict& original)
+{
+    dict = original.dict;
+    PyGILState_STATE s = PyGILState_Ensure();
+    Py_INCREF(dict);
+    PyGILState_Release(s);
+}
+
+AtomicDict::~AtomicDict()
+{
+    PyGILState_STATE s = PyGILState_Ensure();
+    Py_DECREF(dict);
+    PyGILState_Release(s);
+}
+
+PyObject*
+AtomicDict::get(PyObject* key)
+{
+    PyGILState_STATE s = PyGILState_Ensure();
+    PyObject* item = PyDict_GetItem(dict, key);
+    PyGILState_Release(s);
+    return item;
+}
+
+void
+AtomicDict::set(PyObject* key, PyObject* item, bool transfer_ownership)
+{
+    PyGILState_STATE s = PyGILState_Ensure();
+    PyDict_SetItem(dict, key, item);
+    if (transfer_ownership) Py_DECREF(item);
+    PyGILState_Release(s);
+}
+
+void AtomicDict::merge(AtomicDict& other)
+{
+    PyGILState_STATE s = PyGILState_Ensure();
+    PyDict_Update(dict, other.dict);
+    PyGILState_Release(s);
+}
+
 /*
   Helper function to copy a rectangular slice of the input
   buffer to the full input array.
@@ -32,7 +86,7 @@ init_rect(
 }
 
 GridVector
-nine_grid(PyObject* tile_coord, PyObject* tiles)
+nine_grid(PyObject* tile_coord, AtomicDict& tiles)
 {
     const int num_tiles = 9;
     const int offs[]{-1, 0, 1};
@@ -49,7 +103,7 @@ nine_grid(PyObject* tile_coord, PyObject* tiles)
         int _x = x + offs[i % 3];
         int _y = y + offs[i / 3];
         PyObject* c = Py_BuildValue("ii", _x, _y);
-        PyObject* tile = PyDict_GetItem(tiles, c);
+        PyObject* tile = tiles.get(c);
         Py_DECREF(c);
         if (tile)
             grid.push_back(PixelBuffer<chan_t>(tile));
@@ -112,23 +166,22 @@ num_strand_workers(int num_strands, int min_strands_per_worker)
 void
 process_strands(
     worker_function worker, int offset, int min_strands_per_worker,
-    PyObject* strands, PyObject* tiles, PyObject* result)
+    StrandQueue& strands, AtomicDict tiles, AtomicDict result)
 {
-    Py_ssize_t num_strands = PyList_GET_SIZE(strands);
-    int num_threads = num_strand_workers(num_strands, min_strands_per_worker);
+    int num_threads =
+        num_strand_workers(strands.size(), min_strands_per_worker);
 
     std::vector<std::thread> threads(num_threads);
-    std::vector<std::future<PyObject*>> futures(num_threads);
+    std::vector<std::future<AtomicDict>> futures(num_threads);
 
     PyEval_InitThreads();
-    StrandQueue work_queue(strands);
 
     // Create worker threads
     for (int i = 0; i < num_threads; ++i) {
-        std::promise<PyObject*> promise;
+        std::promise<AtomicDict> promise;
         futures[i] = promise.get_future();
         threads[i] = std::thread(
-            worker, offset, std::ref(work_queue), tiles, std::move(promise));
+            worker, offset, std::ref(strands), tiles, std::move(promise));
     }
     // Release the lock to let the workers work
     Py_BEGIN_ALLOW_THREADS
@@ -138,14 +191,11 @@ process_strands(
         // Wait for the output from the threads
         // and merge it into the final result
         futures[i].wait();
-        PyObject* _m = futures[i].get();
-        PyGILState_STATE state;
-        state = PyGILState_Ensure();
-        PyDict_Update(result, _m);
-        Py_DECREF(_m);
-        PyGILState_Release(state);
+        AtomicDict thread_result = futures[i].get();
+        result.merge(thread_result);
         threads[i].join();
     }
 
+    // Reclaim the lock before returning
     Py_END_ALLOW_THREADS
 }
