@@ -2715,9 +2715,27 @@ class _TileRenderWrapper (TileAccessible, TileBlittable):
         """
         super(_TileRenderWrapper, self).__init__()
         self._root = root
+        self._spec = spec
         self._ops = root.get_render_ops(spec)
         self._use_cache = bool(use_cache)
         self._cache = {}
+
+        # Store the subset of layers that are visible, as a list.
+        # If this is a solo layer, only filter from its sub-hierarchy.
+        if spec.solo:
+            input_layers = spec.layers
+        else:
+            input_layers = root.deepiter()
+
+        # This function is quadratic, but unless layer group size and nesting
+        # is very high, it should be fairly harmlessly quadratic
+        def is_visible_layer(l):
+            return (
+                isinstance(l, lib.layer.SurfaceBackedLayer) and
+                l.visible and l.branch_visible
+            )
+
+        self._visible_layers = list(filter(is_visible_layer, input_layers))
 
     @contextlib.contextmanager
     def tile_request(self, tx, ty, readonly):
@@ -2737,16 +2755,28 @@ class _TileRenderWrapper (TileAccessible, TileBlittable):
         if self._use_cache:
             dst = self._cache.get((tx, ty), None)
         if dst is None:
-            tiledims = (tiledsurface.N, tiledsurface.N, 4)
-            dst = np.zeros(tiledims, 'uint16')
-            self._root.render_single_tile(
-                dst, True,
-                tx, ty, 0,
-                ops=self._ops,
-            )
+            bg_hidden = not self._root.root.background_visible
+            if (self._spec.solo or bg_hidden) and self._all_empty(tx, ty):
+                dst = tiledsurface.transparent_tile.rgba
+            else:
+                tiledims = (tiledsurface.N, tiledsurface.N, 4)
+                dst = np.zeros(tiledims, 'uint16')
+                self._root.render_single_tile(
+                    dst, True,
+                    tx, ty, 0,
+                    ops=self._ops,
+                )
             if self._use_cache:
                 self._cache[(tx, ty)] = dst
         yield dst
+
+    def _all_empty(self, tx, ty):
+        """Check that no tile exists at (tx, ty) in any visible layer"""
+        tc = (tx, ty)
+        for layer in self._visible_layers:
+            if tc in layer.get_tile_coords():
+                return False
+        return True
 
     def get_bbox(self):
         """Explicit passthrough of get_bbox"""
