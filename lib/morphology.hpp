@@ -24,7 +24,7 @@
 */
 struct chord {
     chord() : x_offset(0), length_index(0) {}
-    chord(int x, int len_i) : x_offset(x), length_index(len_i){};
+    chord(int x, int len_i) : x_offset(x), length_index(len_i){}
     int x_offset;
     int length_index;
 };
@@ -68,7 +68,7 @@ class MorphBucket
     int height; // structuring element height
     std::vector<chord> se_chords; // structuring element chords
     std::vector<int> se_lengths; // structuring element chord lengths
-    chan_t*** table; // lookup table for UW algorithm (y-offset, x, type)
+    chan_t*** lookup_table; // lookup table for UW algorithm (y-offset, x, type)
     chan_t** input; // input 2d array populated by 3x3 input tile grid
 };
 

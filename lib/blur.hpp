@@ -32,14 +32,14 @@ class BlurBucket
     void initiate(bool can_update, GridVector input);
     // Predicates checking the state of input_full, relative
     // to the tiles in the most recent call to initiate
-    bool input_fully_opaque();
-    bool input_fully_transparent();
+    bool input_is_fully_opaque();
+    bool input_is_fully_transparent();
     // Blur factors used to calculate the value of every blurred pixel
     // based on its horizontal
     const std::vector<fix15_short_t> factors;
     const int radius;
     chan_t** input_full;
-    chan_t** input_vert;
+    chan_t** input_vertical;
 };
 
 

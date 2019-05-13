@@ -48,11 +48,11 @@ MorphBucket::MorphBucket(int radius)
     }
     // Allocate lookup table
     const int num_types = se_lengths.size();
-    table = new chan_t**[height];
+    lookup_table = new chan_t**[height];
     for (int h = 0; h < height; ++h) {
-        table[h] = new chan_t*[width];
+        lookup_table[h] = new chan_t*[width];
         for (int w = 0; w < width; ++w) {
-            table[h][w] = new chan_t[num_types];
+            lookup_table[h][w] = new chan_t[num_types];
         }
     }
 }
@@ -69,11 +69,11 @@ MorphBucket::~MorphBucket()
     // Free lookup table
     for (int h = 0; h < height; ++h) {
         for (int w = 0; w < width; ++w) {
-            delete[] table[h][w];
+            delete[] lookup_table[h][w];
         }
-        delete table[h];
+        delete lookup_table[h];
     }
-    delete[] table;
+    delete[] lookup_table;
 }
 
 /*
@@ -82,11 +82,11 @@ MorphBucket::~MorphBucket()
 void
 MorphBucket::rotate_lut()
 {
-    chan_t** first = table[0];
+    chan_t** first = lookup_table[0];
     for (int y = 0; y < height - 1; ++y) {
-        table[y] = table[y + 1];
+        lookup_table[y] = lookup_table[y + 1];
     }
-    table[height - 1] = first;
+    lookup_table[height - 1] = first;
 }
 
 template <op cmp>
@@ -96,7 +96,7 @@ MorphBucket::populate_row(int y_row, int y_px)
     const int r = radius;
 
     for (int x = 0; x < N + 2 * r; ++x) {
-        table[y_row][x][0] = input[y_px][x];
+        lookup_table[y_row][x][0] = input[y_px][x];
     }
     int prev_len = 1;
     for (size_t len_i = 1; len_i < se_lengths.size(); len_i++) {
@@ -105,9 +105,9 @@ MorphBucket::populate_row(int y_row, int y_px)
         prev_len = len;
         for (int x = 0; x <= N + 2 * r - len; ++x) {
             chan_t ext_v =
-                cmp(table[y_row][x][len_i - 1],
-                    table[y_row][x + len_diff][len_i - 1]);
-            table[y_row][x][len_i] = ext_v; // Consider changing access order
+                cmp(lookup_table[y_row][x][len_i - 1],
+                    lookup_table[y_row][x + len_diff][len_i - 1]);
+            lookup_table[y_row][x][len_i] = ext_v;
         }
     }
 }
@@ -117,7 +117,7 @@ MorphBucket::populate_row(int y_row, int y_px)
   and vertically for any pixel equalling the limit value.
 */
 static bool
-check_lim(chan_t lim, PixelBuffer<chan_t>& buf, int cx, int cy, int w)
+lim_search(chan_t lim, PixelBuffer<chan_t>& buf, int cx, int cy, int w)
 {
     for (int y = 0; y <= 1; ++y) {
         for (int x = -w; x <= w; ++x) {
@@ -148,7 +148,7 @@ MorphBucket::can_skip(PixelBuffer<chan_t> buf)
     if (r > r_limit) {
         int range = MIN((r - r_limit), max_search_radius);
         const int half = N / 2 - 1;
-        if (check_lim(lim, buf, half, half, range)) {
+        if (lim_search(lim, buf, half, half, range)) {
             return true;
         }
     }
@@ -157,10 +157,10 @@ MorphBucket::can_skip(PixelBuffer<chan_t> buf)
         int range = MIN(r - (r_limit / 2), max_search_radius);
         const int q = N / 4;
         const int r_px = -1;
-        if (check_lim(lim, buf, r_px + q, r_px + q, range) && // nw
-            check_lim(lim, buf, r_px + 3 * q, r_px + q, range) && // ne
-            check_lim(lim, buf, r_px + 3 * q, r_px + 3 * q, range) && // se
-            check_lim(lim, buf, r_px + q, r_px + 3 * q, range)) // sw
+        if (lim_search(lim, buf, r_px + q, r_px + q, range) && // nw
+            lim_search(lim, buf, r_px + 3 * q, r_px + q, range) && // ne
+            lim_search(lim, buf, r_px + 3 * q, r_px + 3 * q, range) && // se
+            lim_search(lim, buf, r_px + q, r_px + 3 * q, range)) // sw
         {
             return true;
         }
@@ -189,7 +189,7 @@ MorphBucket::morph(bool can_update, PixelBuffer<chan_t>& dst)
             chan_t ext = init;
             for (int c = 0; c < height; ++c) {
                 chord& ch = se_chords[c];
-                ext = cmp(ext, table[c][x + ch.x_offset + r][ch.length_index]);
+                ext = cmp(ext, lookup_table[c][x + ch.x_offset + r][ch.length_index]);
                 if (ext == lim) break;
             }
             dst_px.write(ext);
@@ -340,11 +340,11 @@ morph(int offset, PyObject* morphed, PyObject* tiles, PyObject* strands)
 bool
 MorphBucket::input_fully_opaque()
 {
-    return all_eq<chan_t>(input, 2 * radius + N, fix15_one);
+    return all_equal_to<chan_t>(input, 2 * radius + N, fix15_one);
 }
 
 bool
 MorphBucket::input_fully_transparent()
 {
-    return all_eq<chan_t>(input, 2 * radius + N, 0);
+    return all_equal_to<chan_t>(input, 2 * radius + N, 0);
 }

@@ -53,9 +53,9 @@ BlurBucket::BlurBucket(int r)
     }
     // Output for horizontal blur,
     // input to vertical blur (Y x X) = (d x N)
-    input_vert = new chan_t*[d];
+    input_vertical = new chan_t*[d];
     for (int i = 0; i < d; ++i) {
-        input_vert[i] = new chan_t[N];
+        input_vertical[i] = new chan_t[N];
     }
 }
 
@@ -64,10 +64,10 @@ BlurBucket::~BlurBucket()
     const int d = N + radius * 2;
     for (int i = 0; i < d; ++i) {
         delete[] input_full[i];
-        delete[] input_vert[i];
+        delete[] input_vertical[i];
     }
     delete[] input_full;
-    delete[] input_vert;
+    delete[] input_vertical;
 }
 
 PyObject*
@@ -75,9 +75,9 @@ BlurBucket::blur(bool can_update, GridVector input_grid)
 {
     initiate(can_update, input_grid);
 
-    if (input_fully_opaque()) return ConstTiles::ALPHA_OPAQUE();
+    if (input_is_fully_opaque()) return ConstTiles::ALPHA_OPAQUE();
 
-    if (input_fully_transparent()) return ConstTiles::ALPHA_TRANSPARENT();
+    if (input_is_fully_transparent()) return ConstTiles::ALPHA_TRANSPARENT();
 
     int r = radius;
 
@@ -92,7 +92,7 @@ BlurBucket::blur(bool can_update, GridVector input_grid)
                 fix15_t in = input_full[y][x + xoffs + r];
                 blurred += fix15_mul(in, factors[xoffs + r]);
             }
-            input_vert[y][x] = fix15_short_clamp(blurred);
+            input_vertical[y][x] = fix15_short_clamp(blurred);
         }
     }
 
@@ -101,7 +101,7 @@ BlurBucket::blur(bool can_update, GridVector input_grid)
         for (int y = 0; y < N; ++y) {
             fix15_t blurred = 0;
             for (int yoffs = -r; yoffs < r + 1; yoffs++) {
-                fix15_t in = input_vert[y + yoffs + r][x];
+                fix15_t in = input_vertical[y + yoffs + r][x];
                 blurred += fix15_mul(in, factors[yoffs + r]);
             }
             out_buf(x, y) = fix15_short_clamp(blurred);
@@ -119,15 +119,15 @@ BlurBucket::initiate(bool can_update, GridVector input)
 
 
 bool
-BlurBucket::input_fully_opaque()
+BlurBucket::input_is_fully_opaque()
 {
-    return all_eq<chan_t>(input_full, 2 * radius + N, fix15_one);
+    return all_equal_to<chan_t>(input_full, 2 * radius + N, fix15_one);
 }
 
 bool
-BlurBucket::input_fully_transparent()
+BlurBucket::input_is_fully_transparent()
 {
-    return all_eq<chan_t>(input_full, 2 * radius + N, 0);
+    return all_equal_to<chan_t>(input_full, 2 * radius + N, 0);
 }
 
 /*
