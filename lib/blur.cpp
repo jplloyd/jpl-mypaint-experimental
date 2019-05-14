@@ -39,30 +39,30 @@ blur_factors(int r)
 }
 
 // Allocate memory for input and intermediate buffers
-BlurBucket::BlurBucket(int r)
+GaussBlurrer::GaussBlurrer(int r)
     : factors(blur_factors(r)), radius((factors.size() - 1) / 2)
 {
     // Suppress uninitialization warning, the output
     // array is always fully populated before use
-    const int d = N + radius * 2;
+    const int width = N + radius * 2;
     // Output from 3x3-grid,
     // input to horizontal blur (Y x X) = (d x d)
-    input_full = new chan_t*[d];
-    for (int i = 0; i < d; ++i) {
-        input_full[i] = new chan_t[d];
+    input_full = new chan_t*[width];
+    for (int i = 0; i < width; ++i) {
+        input_full[i] = new chan_t[width];
     }
     // Output for horizontal blur,
     // input to vertical blur (Y x X) = (d x N)
-    input_vertical = new chan_t*[d];
-    for (int i = 0; i < d; ++i) {
+    input_vertical = new chan_t*[width];
+    for (int i = 0; i < width; ++i) {
         input_vertical[i] = new chan_t[N];
     }
 }
 
-BlurBucket::~BlurBucket()
+GaussBlurrer::~GaussBlurrer()
 {
-    const int d = N + radius * 2;
-    for (int i = 0; i < d; ++i) {
+    const int width = N + radius * 2;
+    for (int i = 0; i < width; ++i) {
         delete[] input_full[i];
         delete[] input_vertical[i];
     }
@@ -71,7 +71,7 @@ BlurBucket::~BlurBucket()
 }
 
 PyObject*
-BlurBucket::blur(bool can_update, GridVector input_grid)
+GaussBlurrer::blur(bool can_update, GridVector input_grid)
 {
     initiate(can_update, input_grid);
 
@@ -112,20 +112,20 @@ BlurBucket::blur(bool can_update, GridVector input_grid)
 }
 
 void
-BlurBucket::initiate(bool can_update, GridVector input)
+GaussBlurrer::initiate(bool can_update, GridVector input)
 {
     init_from_nine_grid(radius, input_full, can_update, input);
 }
 
 
 bool
-BlurBucket::input_is_fully_opaque()
+GaussBlurrer::input_is_fully_opaque()
 {
     return all_equal_to<chan_t>(input_full, 2 * radius + N, fix15_one);
 }
 
 bool
-BlurBucket::input_is_fully_transparent()
+GaussBlurrer::input_is_fully_transparent()
 {
     return all_equal_to<chan_t>(input_full, 2 * radius + N, 0);
 }
@@ -140,7 +140,7 @@ BlurBucket::input_is_fully_transparent()
 */
 void
 blur_strand(
-    Strand& strand, AtomicDict& tiles, BlurBucket& bucket, AtomicDict& blurred)
+    Strand& strand, AtomicDict& tiles, GaussBlurrer& bucket, AtomicDict& blurred)
 {
     bool can_update = false;
     PyObject* tile_coord;
@@ -163,7 +163,7 @@ blur_worker(
     std::promise<AtomicDict> result)
 {
     AtomicDict blurred;
-    BlurBucket bucket(radius);
+    GaussBlurrer bucket(radius);
     Strand strand;
     while (queue.pop(strand)) {
         blur_strand(strand, tiles, bucket, blurred);

@@ -46,11 +46,11 @@ typedef chan_t op(chan_t, chan_t);
   Output array to store morphed alpha values (consider removing/replacing).
 */
 
-class MorphBucket
+class Morpher
 {
   public:
-    explicit MorphBucket(int radius);
-    ~MorphBucket();
+    explicit Morpher(int radius);
+    ~Morpher();
     template <chan_t init, chan_t lim, op cmp>
     void morph(bool can_update, PixelBuffer<chan_t>& dst);
     template <chan_t lim>

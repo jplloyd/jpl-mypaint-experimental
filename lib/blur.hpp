@@ -20,11 +20,11 @@
   horizontally, writing the output to an intermediate array. Secondly the
   intermediate array is blurred vertically, writing the output into a new tile.
 */
-class BlurBucket
+class GaussBlurrer
 {
   public:
-    explicit BlurBucket(int radius);
-    ~BlurBucket();
+    explicit GaussBlurrer(int radius);
+    ~GaussBlurrer();
     PyObject* blur(bool can_update, GridVector input);
 
   private:

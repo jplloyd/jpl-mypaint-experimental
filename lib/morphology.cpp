@@ -13,13 +13,28 @@
 #include <cmath>
 #include <tuple>
 
-MorphBucket::MorphBucket(int radius)
+/*
+  Get the width of a horizontal chord, located at a given vertical distance
+  from the center of the circle for a circular structuring element with the
+  given radius. Note that the radius is not a radius the normal sense since
+  the width always has to be an uneven number - the width is 2r + 1.
+*/
+static inline int
+chord_width(int radius, int y_offset)
+{
+    // Simple derivation from the pythagorean theorem, adjusted to
+    // achieve vertical and horizontal symmetry and ensuring that
+    // padding only has to be generated up to the first chord.
+    int hw = floor(sqrt(powf((radius + 0.5), 2) - powf(y_offset, 2)));
+    return 1 + 2 * hw;
+}
+
+Morpher::Morpher(int radius)
     : radius(radius), height(radius * 2 + 1), se_chords(height)
 {
     // Create structuring element
 
-    int fst_length =
-        1 + 2 * floor(sqrt(powf((radius + 0.5), 2) - powf(radius, 2)));
+    int fst_length = chord_width(radius, radius);
 
     for (int pad = 1; pad < fst_length; pad *= 2) {
         se_lengths.push_back(pad);
@@ -27,11 +42,10 @@ MorphBucket::MorphBucket(int radius)
     // Go through the first half of the circle and populate the indices,
     // adding new unique chords as necessary
     for (int y = -radius; y <= 0; ++y) {
-        int x_offs = floor(sqrt(powf((radius + 0.5), 2) - powf(y, 2)));
-        int length = 1 + x_offs * 2;
+        int length = chord_width(radius, y);
         if (se_lengths.back() != length) se_lengths.push_back(length);
-
-        se_chords[y + radius] = chord(0 - x_offs, se_lengths.size() - 1);
+        int x_offset = (length - 1) / -2;
+        se_chords[y + radius] = chord(x_offset, se_lengths.size() - 1);
     }
 
     // Copy the mirrored indices from the first half to the second
@@ -56,7 +70,7 @@ MorphBucket::MorphBucket(int radius)
         }
     }
 }
-MorphBucket::~MorphBucket()
+Morpher::~Morpher()
 {
     const int width = N + 2 * radius;
 
@@ -80,7 +94,7 @@ MorphBucket::~MorphBucket()
   Rotate the lookup table down one step
 */
 void
-MorphBucket::rotate_lut()
+Morpher::rotate_lut()
 {
     chan_t** first = lookup_table[0];
     for (int y = 0; y < height - 1; ++y) {
@@ -91,7 +105,7 @@ MorphBucket::rotate_lut()
 
 template <op cmp>
 void
-MorphBucket::populate_row(int y_row, int y_px)
+Morpher::populate_row(int y_row, int y_px)
 {
     const int r = radius;
 
@@ -136,7 +150,7 @@ lim_search(chan_t lim, PixelBuffer<chan_t>& buf, int cx, int cy, int w)
 */
 template <chan_t lim>
 bool
-MorphBucket::can_skip(PixelBuffer<chan_t> buf)
+Morpher::can_skip(PixelBuffer<chan_t> buf)
 {
     const int r = radius;
     const int max_search_radius = 15;
@@ -171,7 +185,7 @@ MorphBucket::can_skip(PixelBuffer<chan_t> buf)
 
 template <chan_t init, chan_t lim, op cmp>
 void
-MorphBucket::morph(bool can_update, PixelBuffer<chan_t>& dst)
+Morpher::morph(bool can_update, PixelBuffer<chan_t>& dst)
 {
     const int r = radius;
 
@@ -203,7 +217,7 @@ MorphBucket::morph(bool can_update, PixelBuffer<chan_t>& dst)
 }
 
 void
-MorphBucket::initiate(bool can_update, GridVector grid)
+Morpher::initiate(bool can_update, GridVector grid)
 {
     init_from_nine_grid(radius, input, can_update, grid);
 }
@@ -221,7 +235,7 @@ MorphBucket::initiate(bool can_update, GridVector grid)
 template <chan_t init, chan_t lim, op cmp>
 static std::pair<bool, PyObject*>
 generic_morph(
-    MorphBucket& mb, bool update_input, bool update_lut, GridVector input)
+    Morpher& mb, bool update_input, bool update_lut, GridVector input)
 {
     // Run a quick check, only run for large radiuses
     if (mb.can_skip<lim>(input[4])) {
@@ -262,14 +276,14 @@ min(chan_t a, chan_t b)
 }
 
 std::pair<bool, PyObject*>
-dilate(MorphBucket& mb, bool update_input, bool update_lut, GridVector input)
+dilate(Morpher& mb, bool update_input, bool update_lut, GridVector input)
 {
     return generic_morph<0, fix15_one, max>(
         mb, update_input, update_lut, input);
 }
 
 std::pair<bool, PyObject*>
-erode(MorphBucket& mb, bool update_input, bool update_lut, GridVector input)
+erode(Morpher& mb, bool update_input, bool update_lut, GridVector input)
 {
     return generic_morph<fix15_one, 0, min>(
         mb, update_input, update_lut, input);
@@ -280,7 +294,7 @@ erode(MorphBucket& mb, bool update_input, bool update_lut, GridVector input)
 void
 morph_strand(
     int offset, // Dilation/erosion radius (+/-)
-    Strand& strand, AtomicDict tiles, MorphBucket& bucket, AtomicDict morphed)
+    Strand& strand, AtomicDict tiles, Morpher& bucket, AtomicDict morphed)
 {
     auto op = offset > 0 ? dilate : erode;
     bool update_input = false;
@@ -312,7 +326,7 @@ morph_worker(
     std::promise<AtomicDict> result)
 {
     AtomicDict morphed;
-    MorphBucket bucket(abs(offset));
+    Morpher bucket(abs(offset));
     Strand strand;
     while (queue.pop(strand)) {
         morph_strand(offset, strand, tiles, bucket, morphed);
@@ -338,13 +352,13 @@ morph(int offset, PyObject* morphed, PyObject* tiles, PyObject* strands)
 }
 
 bool
-MorphBucket::input_fully_opaque()
+Morpher::input_fully_opaque()
 {
     return all_equal_to<chan_t>(input, 2 * radius + N, fix15_one);
 }
 
 bool
-MorphBucket::input_fully_transparent()
+Morpher::input_fully_transparent()
 {
     return all_equal_to<chan_t>(input, 2 * radius + N, 0);
 }
