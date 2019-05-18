@@ -92,6 +92,22 @@ def starting_coordinates(x, y):
     return init_tx, init_ty, init_x, init_y
 
 
+def seeds_by_tile(seeds):
+    """Partition and convert seed coordinates
+
+    Partition a list of model-space seed coordinates into lists of
+    in-tile coordinates associated to their respective tile coordinate
+    in a dictionary.
+    """
+    tile_seeds = dict()
+    for (x, y) in seeds:
+        tx, ty, px, py = starting_coordinates(x, y)
+        seed_list = tile_seeds.get((tx, ty), [])
+        seed_list.append((px, py))
+        tile_seeds[(tx, ty)] = seed_list
+    return tile_seeds
+
+
 def get_target_color(src, tx, ty, px, py):
     """Get the pixel color for the given tile/pixel coordinates"""
     with src.tile_request(tx, ty, readonly=True) as start:
@@ -107,14 +123,16 @@ def get_target_color(src, tx, ty, px, py):
 # Main fill handling function
 
 def flood_fill(
-        src, x, y, color, tolerance, offset, feather,
+        src, target_pos, seeds, color, tolerance, offset, feather,
         gap_closing_options, mode, framed, bbox, dst):
     """ Top-level flood fill interface, initiating and delegating actual fill
 
     :param src: Source surface-like object
     :type src: Anything supporting readonly tile_request()
-    :param x: Starting point X coordinate
-    :param y: Starting point Y coordinate
+    :param target_pos: pixel coordinate of target color
+    :type target_pos: tuple
+    :param seeds: set of seed pixel coordinates {(x, y)...}
+    :type seeds: set
     :param color: an RGB color
     :type color: tuple
     :param tolerance: how much filled pixels are permitted to vary
@@ -149,11 +167,12 @@ def flood_fill(
     feather = lib.helpers.clamp(feather, 0, TILE_SIZE)
 
     # Initial parameters
-    starting_point = starting_coordinates(x, y)
+    starting_point = starting_coordinates(*target_pos)
     r, g, b, a = get_target_color(src, *starting_point)
     filler = myplib.Filler(r, g, b, a, tolerance)
+    seed_lists = seeds_by_tile(seeds)
 
-    fill_args = (src, starting_point, tiles_bbox, filler)
+    fill_args = (src, seed_lists, tiles_bbox, filler)
 
     if gap_closing_options:
         fill_args += (gap_closing_options,)
@@ -255,7 +274,7 @@ def composite(mode, fill_col, trim_result, filled, tiles_bbox, dst):
         dst.notify_observers(*bbox)
 
 
-def scanline_fill(src, init, tiles_bbox, filler):
+def scanline_fill(src, seed_lists, tiles_bbox, filler):
     """ Perform a scanline fill and return the filled tiles
 
     Perform a scanline fill using the given starting point and tile,
@@ -263,6 +282,8 @@ def scanline_fill(src, init, tiles_bbox, filler):
     provided filler instance.
 
     :param src: Source surface-like object
+    :param seed_lists: dictionary, pairing tile coords with lists of seeds
+    :type seed_lists: dict
     :param init: coordinates for starting tile and pixel
     :type init: (int, int, int, int)
     :param tiles_bbox: Bounding box for the fill
@@ -283,8 +304,10 @@ def scanline_fill(src, init, tiles_bbox, filler):
     )
 
     # Starting coordinates + direction of origin (from within)
-    _tx, _ty, _px, _py = init
-    tileq = [((_tx, _ty), (_px, _py), myplib.edges.none)]
+    tileq = []
+    pairs = seed_lists.items() if PY3 else seed_lists.iteritems()
+    for tc, seeds in pairs:
+        tileq.append((tc, seeds, myplib.edges.none))
 
     tfs = _TileFillSkipper(tiles_bbox, filler, set({}))
 
@@ -374,7 +397,7 @@ class _TileFillSkipper:
         return self.FULL_OVERFLOWS[from_dir]
 
 
-def gap_closing_fill(src, init, tiles_bbox, filler, gap_closing_options):
+def gap_closing_fill(src, seed_lists, tiles_bbox, filler, gap_closing_options):
     """ Fill loop that finds and uses gap data to avoid unwanted leaks
 
     Gaps are defined as distances of fillable pixels enclosed on two sides
@@ -398,21 +421,24 @@ def gap_closing_fill(src, init, tiles_bbox, filler, gap_closing_options):
         [(edge.south,), (edge.west,), (edge.north,), (edge.east,)],
     ]
 
+    tileq = []
+    pairs = seed_lists.items() if PY3 else seed_lists.iteritems()
+    for tc, seeds in pairs:
+        tileq.append((tc, seeds))
+
     options = gap_closing_options
     max_gap_size = lib.helpers.clamp(options.max_gap_size, 1, TILE_SIZE)
     gc_filler = myplib.GapClosingFiller(max_gap_size, options.retract_seeps)
     distbucket = myplib.DistanceBucket(max_gap_size)
 
-    init_tx, init_ty, init_px, init_py = init
-    tileq = [((init_tx, init_ty), (init_px, init_py))]
-
     total_px = 0
-
+    tiles_processed = 0
     dist_data = None
     while len(tileq) > 0:
         tile_coord, seeds = tileq.pop(0)
         if tile_coord in final:
             continue
+        tiles_processed += 1
         # Pixel limits within tiles vary at the bounding box edges
         px_bounds = tiles_bbox.tile_bounds(tile_coord)
         # Create distance-data and alpha output tiles for the fill
@@ -423,20 +449,18 @@ def gap_closing_fill(src, init, tiles_bbox, filler, gap_closing_options):
             if dist_data is None:
                 dist_data = np.full((N, N), 2*N*N, 'uint16')
             # Search and mark any gap distances for the tile
-            if (
-                    all(map(lambda t: t is _FULL_TILE, grid))
-                    or not myplib.find_gaps(distbucket, dist_data, *grid)
-            ):
+            # We skip the search if we have a 9-grid of only full tiles
+            # since there cannot be any gaps to find in that case
+            all_full = all(map(lambda t: t is _FULL_TILE, grid))
+            if all_full or not myplib.find_gaps(distbucket, dist_data, *grid):
                 distances[tile_coord] = _GAPLESS_TILE
                 # Check if fill can be skipped directly
-                if (
-                        grid[0] is _FULL_TILE and
-                        not tiles_bbox.crossing(tile_coord) and
-                        isinstance(seeds, tuple)
-                ):
+                can_skip = isinstance(seeds, tuple) or len(seeds[0]) == 2
+                can_skip &= not tiles_bbox.crossing(tile_coord)
+                if can_skip and grid[0] is _FULL_TILE:
                     final.add(tile_coord)
                     filled[tile_coord] = _FULL_TILE
-                    if len(seeds) > 1:
+                    if isinstance(seeds, list):
                         out_seeds = const_overflows[edge.none]
                     else:
                         out_seeds = const_overflows[seeds[0]]
@@ -446,20 +470,26 @@ def gap_closing_fill(src, init, tiles_bbox, filler, gap_closing_options):
                 distances[tile_coord] = dist_data
                 dist_data = None
             filled[tile_coord] = np.zeros((N, N), 'uint16')
-        if isinstance(seeds, tuple) and len(seeds) > 1:
+        # Complement data for initial seeds
+        if not isinstance(seeds, tuple) and len(seeds[0]) < 3:
             # Fetch distance for initial seed coord
+            complemented_seeds = []
             dists = distances[tile_coord]
-            init_x, init_y = seeds
-            init_distance = dists[init_y][init_x]
+            all_not_max = True
+            for (px, py) in seeds:
+                distance = dists[px][py]
+                if distance == 2*N*N:
+                    all_not_max = False
+                complemented_seeds.append((px, py, distance))
+            seeds = complemented_seeds
             # If the fill is starting at a point with a detected distance,
             # disable seep retraction - otherwise it is very likely
             # that the result will be completely empty.
-            if init_distance < 2*N*N:
+            if len(seed_lists) == 1 and all_not_max:
                 options.retract_seeps = False
                 gc_filler = myplib.GapClosingFiller(
                     max_gap_size, options.retract_seeps
                 )
-            seeds = [(init_x, init_y, init_distance)]
         # Run the gap-closing fill for the tile
         result = gc_filler.fill(
             full_alphas[tile_coord], distances[tile_coord],
@@ -475,7 +505,6 @@ def gap_closing_fill(src, init, tiles_bbox, filler, gap_closing_options):
         total_px += px_f
         if fill_edges:
             unseep_q.append((tile_coord, fill_edges, True))
-
     # Seep inversion is basically just a four-way 0-alpha fill
     # with different conditions. It only backs off into the original
     # fill and therefore does not require creation of new tiles

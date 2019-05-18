@@ -58,6 +58,8 @@ class Filler
     // filled pixel, where an alpha of 0 indicates that the pixel should not be
     // filled (and the fill not propagated through that pixel).
     chan_t pixel_fill_alpha(const rgba& src_px);
+    void queue_seeds(
+        PyObject* seeds, PixelBuffer<rgba>& src, PixelBuffer<chan_t> dst);
     void queue_ranges(
         edge direction, PyObject* seeds, bool marks[N],
         PixelBuffer<rgba>& src, PixelBuffer<chan_t>& dst);
