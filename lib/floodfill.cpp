@@ -362,8 +362,8 @@ Filler::fill(
         }
     }
 
-    if (seed_origin !=
-        edges::none) { // Remove incoming seeds from outgoing seeds
+    if (seed_origin != edges::none) {
+        // Remove incoming seeds from outgoing seeds
         bool* edge = edge_marks[seed_origin];
         for (int n = 0; n < N; ++n) {
             edge[n] = edge[n] && !input_seeds[n];
