@@ -615,7 +615,7 @@ def complement_gc_seeds(seeds, distance_tile):
         complemented_seeds = []
         all_not_max = True
         for (px, py) in seeds:
-            distance = distance_tile[px][py]
+            distance = distance_tile[py][px]
             if distance == INF_DIST:
                 all_not_max = False
             complemented_seeds.append((px, py, distance))
