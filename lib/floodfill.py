@@ -34,15 +34,10 @@ _EMPTY_RGBA = None
 _GAPLESS_TILE = np.full((N, N), INF_DIST, 'uint16')
 _GAPLESS_TILE.flags.writeable = False
 
-edge = myplib.edges
+EDGE = myplib.edges
 
 
-def is_full(tile):
-    """Check if the given tile is the fully opaque alpha tile"""
-    return tile is _FULL_TILE
-
-
-class GapClosingOptions():
+class GapClosingOptions:
     """Container of parameters for gap closing fill operations
     to avoid updates to the call chain in case the parameter set
     is altered.
@@ -50,19 +45,6 @@ class GapClosingOptions():
     def __init__(self, max_gap_size, retract_seeps):
         self.max_gap_size = max_gap_size
         self.retract_seeps = retract_seeps
-
-
-def orthogonal(tile_coord):
-    """ Return the coordinates orthogonal to the input coordinate.
-
-    Return coordinates orthogonal to the input coordinate,
-    in the following order:
-
-      0
-    3   1
-      2
-    """
-    return fc.nine_grid(tile_coord)[1:5]
 
 
 def enqueue_overflows(queue, tile_coord, seeds, tiles_bbox, *p):
@@ -81,7 +63,7 @@ def enqueue_overflows(queue, tile_coord, seeds, tiles_bbox, *p):
     NOTE: This function improves readability significantly in exchange for a
     small performance hit. Replace with explicit queueing if too slow.
     """
-    for edge in zip(*(orthogonal(tile_coord), seeds) + p):
+    for edge in zip(*(fc.orthogonal(tile_coord), seeds) + p):
         edge_coord = edge[0]
         edge_seeds = edge[1]
         if edge_seeds and not tiles_bbox.outside(edge_coord):
@@ -159,20 +141,20 @@ def flood_fill(
     The resulting tiles are composited into dst.
     """
 
-    _, _, w, h = bbox
-    if w <= 0 or h <= 0:
+    _, _, width, height = bbox
+    if width <= 0 or height <= 0:
         return
     tiles_bbox = fc.TileBoundingBox(bbox)
     del bbox
+
     # Basic safety clamping
     tolerance = lib.helpers.clamp(tolerance, 0.0, 1.0)
     offset = lib.helpers.clamp(offset, -TILE_SIZE, TILE_SIZE)
     feather = lib.helpers.clamp(feather, 0, TILE_SIZE)
 
     # Initial parameters
-    starting_point = starting_coordinates(*target_pos)
-    r, g, b, a = get_target_color(src, *starting_point)
-    filler = myplib.Filler(r, g, b, a, tolerance)
+    target_color = get_target_color(src, *starting_coordinates(*target_pos))
+    filler = myplib.Filler(*(target_color + (tolerance,)))
     seed_lists = seeds_by_tile(seeds)
 
     fill_args = (src, seed_lists, tiles_bbox, filler)
@@ -250,7 +232,7 @@ def composite(mode, fill_col, trim_result, filled, tiles_bbox, dst):
             # Copy full tiles directly if not on the bounding box edge
             # unless the fill is dilated or blurred with no frame set
             cut_off = trim_result and tiles_bbox.crossing(tile_coord)
-            if is_full(src_tile) and not cut_off:
+            if src_tile is _FULL_TILE and not cut_off:
                 if mode == myplib.CombineNormal:
                     myplib.tile_copy_rgba16_into_rgba16(full_rgba, dst_tile)
                     continue
@@ -287,8 +269,6 @@ def scanline_fill(src, seed_lists, tiles_bbox, filler):
     :param src: Source surface-like object
     :param seed_lists: dictionary, pairing tile coords with lists of seeds
     :type seed_lists: dict
-    :param init: coordinates for starting tile and pixel
-    :type init: (int, int, int, int)
     :param tiles_bbox: Bounding box for the fill
     :type tiles_bbox: lib.fill_common.TileBoundingBox
     :param filler: filler instance performing the per-tile fill operation
@@ -300,17 +280,17 @@ def scanline_fill(src, seed_lists, tiles_bbox, filler):
     filled = {}
 
     inv_edges = (
-        edge.south,
-        edge.west,
-        edge.north,
-        edge.east
+        EDGE.south,
+        EDGE.west,
+        EDGE.north,
+        EDGE.east
     )
 
     # Starting coordinates + direction of origin (from within)
     tileq = []
     pairs = seed_lists.items() if PY3 else seed_lists.iteritems()
-    for tc, seeds in pairs:
-        tileq.append((tc, seeds, myplib.edges.none))
+    for seed_tile_coord, seeds in pairs:
+        tileq.append((seed_tile_coord, seeds, myplib.edges.none))
 
     tfs = _TileFillSkipper(tiles_bbox, filler, set({}))
 
@@ -416,14 +396,15 @@ def gap_closing_fill(src, seed_lists, tiles_bbox, filler, gap_closing_options):
 
     seed_queue = []
     pairs = seed_lists.items() if PY3 else seed_lists.iteritems()
-    for tc, seeds in pairs:
-        seed_queue.append((tc, seeds))
+    for seed_tile_coord, seeds in pairs:
+        seed_queue.append((seed_tile_coord, seeds))
 
     options = gap_closing_options
     max_gap_size = lib.helpers.clamp(options.max_gap_size, 1, TILE_SIZE)
     gc_filler = myplib.GapClosingFiller(max_gap_size, options.retract_seeps)
     gc_handler = _GCTileHandler(final, max_gap_size, tiles_bbox, filler, src)
     total_px = 0
+    skip_unseeping = False
 
     while len(seed_queue) > 0:
         tile_coord, seeds = seed_queue.pop(0)
@@ -435,13 +416,13 @@ def gap_closing_fill(src, seed_lists, tiles_bbox, filler, gap_closing_options):
         if overflows:
             filled[tile_coord] = _FULL_TILE
         else:
-            # Complement data for initial seeds
-            seeds, all_not_max = complement_gc_seeds(seeds, dist_t)
+            # Complement data for initial seeds (if they are initial seeds)
+            seeds, any_not_max = complement_gc_seeds(seeds, dist_t)
             # If the fill is starting at a point with a detected distance,
             # disable seep retraction - otherwise it is very likely
             # that the result will be completely empty.
-            if all_not_max and len(seed_lists) == 1:
-                gc_filler = myplib.GapClosingFiller(max_gap_size, False)
+            if any_not_max:
+                skip_unseeping = True
             # Pixel limits within tiles can vary at the bounding box edges
             px_bounds = tiles_bbox.tile_bounds(tile_coord)
             # Create new output tile if not already present
@@ -461,16 +442,17 @@ def gap_closing_fill(src, seed_lists, tiles_bbox, filler, gap_closing_options):
             # When seep inversion is enabled, track total pixels filled
             # and coordinates where the fill stopped due to distance conditions
             total_px += px_f
-            if fill_edges:
+            if not skip_unseeping and fill_edges:
                 unseep_queue.append((tile_coord, fill_edges, True))
         # Enqueue overflows, whether skipping or not
         enqueue_overflows(seed_queue, tile_coord, overflows, tiles_bbox)
 
     # If enabled, pull the fill back into the gaps to stop before them
-    unseep(
-        unseep_queue, filled, gc_filler,
-        total_px, tiles_bbox, gc_handler.distances
-    )
+    if not skip_unseeping:
+        unseep(
+            unseep_queue, filled, gc_filler,
+            total_px, tiles_bbox, gc_handler.distances
+        )
     return filled
 
 
@@ -481,11 +463,11 @@ class _GCTileHandler(object):
     gap closing fill operations.
     """
     OVERFLOWS = [
-        [(), (edge.west,), (edge.north,), (edge.east,)],
-        [(edge.south,), (), (edge.north,), (edge.east,)],
-        [(edge.south,), (edge.west,), (), (edge.east,)],
-        [(edge.south,), (edge.west,), (edge.north,), ()],
-        [(edge.south,), (edge.west,), (edge.north,), (edge.east,)],
+        [(), (EDGE.west,), (EDGE.north,), (EDGE.east,)],
+        [(EDGE.south,), (), (EDGE.north,), (EDGE.east,)],
+        [(EDGE.south,), (EDGE.west,), (), (EDGE.east,)],
+        [(EDGE.south,), (EDGE.west,), (EDGE.north,), ()],
+        [(EDGE.south,), (EDGE.west,), (EDGE.north,), (EDGE.east,)],
     ]
 
     def __init__(self, final, max_gap_size, tiles_bbox, filler, src):
@@ -523,12 +505,12 @@ class _GCTileHandler(object):
                 can_skip_fill = (
                     (all_full or grid[0] is _FULL_TILE) and
                     not self._bbox.crossing(tile_coord) and
-                    skippable_gc_seeds(seeds)
+                    gc_seeds_skippable(seeds)
                 )
                 if can_skip_fill:
                     self.final.add(tile_coord)
                     if isinstance(seeds, list):
-                        overflows = self.OVERFLOWS[edge.none]
+                        overflows = self.OVERFLOWS[EDGE.none]
                     else:
                         overflows = self.OVERFLOWS[seeds[0]]
                     return _FULL_TILE, _GAPLESS_TILE, overflows
@@ -633,18 +615,18 @@ def complement_gc_seeds(seeds, distance_tile):
     if isinstance(seeds, list) and len(seeds[0]) < 3:
         # Fetch distance for initial seed coord
         complemented_seeds = []
-        all_not_max = True
+        any_not_max = False
         for (px, py) in seeds:
-            distance = distance_tile[px][py]
+            distance = distance_tile[py][px]
             if distance == INF_DIST:
-                all_not_max = False
+                any_not_max = True
             complemented_seeds.append((px, py, distance))
-        return complemented_seeds, all_not_max
+        return complemented_seeds, any_not_max
     else:
         return seeds, False
 
 
-def skippable_gc_seeds(seeds):
+def gc_seeds_skippable(seeds):
     return (
         isinstance(seeds, tuple) or  # edge constant - a full edge of seeds
         len(seeds[0]) == 2 or  # initial seeds
