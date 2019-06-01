@@ -1040,6 +1040,8 @@ class Document (CanvasController):  # TODO: rename to "DocumentController"
     def blink_layer(self, action=None):
         if self.app.preferences.get("ui.blink_layers", True):
             self.layerblink_state.activate(action)
+        elif self.model.layer_stack.current_layer_solo:
+            self.tdw.queue_draw()
 
     def pick_context(self, x, y, action=None):
         """Picks layer and brush
