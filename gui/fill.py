@@ -152,7 +152,7 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         self._overlay = FloodFillOverlay(tdw)
         self._overlay.add_point((event.x, event.y))
         if self._fill_permitted:
-            self._seed_pixels.add((x, y))
+            self._seed_pixels.add((int(x), int(y)))
 
     def drag_stop_cb(self, tdw):
         """Remove overlay and run the fill if valid seeds were marked"""
