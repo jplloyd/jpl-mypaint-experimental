@@ -748,8 +748,9 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
 
         See also `lib.layer.Layer.flood_fill()` and `fill.flood_fill()`.
         """
-        flood_fill(self, target_pos, seeds, color, tolerance, offset, feather,
-                   gap_closing_options, mode, framed, bbox, dst_surface)
+        return flood_fill(
+            self, target_pos, seeds, color, tolerance, offset, feather,
+            gap_closing_options, mode, framed, bbox, dst_surface)
 
     @contextlib.contextmanager
     def cairo_request(self, x, y, w, h, mode=lib.modes.DEFAULT_MODE):
@@ -1277,7 +1278,7 @@ def flood_fill(src, target_pos, seeds, color, tolerance, offset, feather,
 
     """
     lib.floodfill._EMPTY_RGBA = transparent_tile.rgba
-    lib.floodfill.flood_fill(
+    return lib.floodfill.flood_fill(
         src, target_pos, seeds, color, tolerance, offset, feather,
         gap_closing_options, mode, framed, bbox, dst)
 
