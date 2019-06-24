@@ -34,6 +34,7 @@ import lib.mypaintlib
 import lib.layer
 import lib.modes
 
+
 ## Class defs
 
 class FloodFillMode (gui.mode.ScrollableModeMixin,
@@ -57,9 +58,17 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
     _CURSOR_FILL_NORMAL = gui.cursor.Name.CROSSHAIR_OPEN_PRECISE
     _CURSOR_FILL_ERASER = gui.cursor.Name.ERASER
     _CURSOR_FILL_ALPHA_LOCKED = gui.cursor.Name.ALPHA_LOCK
+    _CURSOR_FILL_COLORIZE = gui.cursor.Name.COLORIZE
     _CURSOR_FILL_FORBIDDEN = gui.cursor.Name.ARROW_FORBIDDEN
 
-    ## Instance vars (and defaults)
+    _MODE_CURSORS = [
+        _CURSOR_FILL_NORMAL,
+        _CURSOR_FILL_ERASER,
+        _CURSOR_FILL_ALPHA_LOCKED,
+        _CURSOR_FILL_COLORIZE,
+    ]
+
+    # Instance vars (and defaults)
 
     pointer_behavior = gui.mode.Behavior.PAINT_NOBRUSH
     scroll_behavior = gui.mode.Behavior.CHANGE_VIEW
@@ -85,12 +94,7 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         return self.app.cursors.get_action_cursor(action_name, name)
 
     def get_current_cursor(self):
-        if self.bm.eraser_mode.active:
-            return self._CURSOR_FILL_ERASER
-        elif self.bm.lock_alpha_mode.active:
-            return self._CURSOR_FILL_ALPHA_LOCKED
-        else:
-            return self._CURSOR_FILL_NORMAL
+        return self._MODE_CURSORS[self.bm.active_mode.mode_type]
 
     ## Method defs
 
@@ -179,6 +183,11 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         # erasing - overrides other compositing modes when enabled
         elif blend_mode == BlendModes.ERASE:
             comp_mode = lib.mypaintlib.CombineDestinationOut
+
+        # colorize - non-spectral (for now) color blend + alpha locking
+        elif blend_mode == BlendModes.COLORIZE:
+            comp_mode = lib.mypaintlib.CombineColor
+            lock_alpha = True
 
         return lock_alpha, comp_mode
 
@@ -851,9 +860,7 @@ class FloodFillOptionsWidget (Gtk.Grid):
         cls = self.__class__
         if cls._BLEND_MODES is None:
             cls._BLEND_MODES = BlendModes()
-            cls._BLEND_MODES.colorize_mode.enabled = False
         return cls._BLEND_MODES
->>>>>>> ceb0595... Floodfill: add UI controls for opacity/blend modes
 
     @property
     def tolerance(self):
