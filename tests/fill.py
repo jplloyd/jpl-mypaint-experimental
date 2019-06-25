@@ -122,7 +122,7 @@ class FillTestsBase(unittest.TestCase):
     def fill(
             self, src, dst, bbox=None, init_xy=None,
             tol=0.2, offset=0, feather=0, gc=None,
-            framed = False
+            framed=False
     ):
         """
         :param src: Outline goes here
@@ -148,11 +148,15 @@ class FillTestsBase(unittest.TestCase):
             x, y = init_xy
         col = (0.0, 0.0, 0.0)
         mode = mypaintlib.CombineNormal
+        lock_alpha = False
         seeds = {(x, y)}
-        handle = src.flood_fill(
-            (x, y), seeds, col, tol, offset, feather,
-            gc, mode, framed, bbox, dst
+        opacity = 1.0
+        args = floodfill.FloodFillArguments(
+            (x, y), seeds, col, tol, offset,
+            feather, gc, mode, lock_alpha,
+            opacity, framed, bbox
         )
+        handle = src.flood_fill(args, dst)
         handle.wait()
 
     @classmethod
@@ -495,7 +499,9 @@ class PerformanceTests(FillTestsBase):
             for _ in range(repeats):
                 self.fill(src, dst, offset=offs)
             avg_time = 1000 * (time() - t0) / repeats
-            print(src.name, "\t", offs, "\t\t", repeats, "\t\t%0.2fms" % avg_time)
+            print(
+                src.name, "\t", offs, "\t\t", repeats, "\t\t%0.2fms" % avg_time
+            )
         dst.clear()
 
     def test_morph_only(self):
