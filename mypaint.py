@@ -246,7 +246,7 @@ def init_gettext(localepath, localepath_brushlib):
     # Source of many a problem down the line, so lotsa debugging here.
     logger.debug("localepath: %r", localepath)
     logger.debug("localepath_brushlib: %r", localepath_brushlib)
-    logger.debug("getdefaultlocale(): %r", locale.getdefaultlocale())
+    logger.debug("getdefaultlocale(): %r", lib.i18n.getdefaultlocale())
 
     # Set the user's preferred locale.
     # https://docs.python.org/2/library/locale.html
