@@ -581,7 +581,9 @@ class LayerStackMove (object):
             move.cleanup()
 
     def process(self, n=200):
-        n = max(20, int(n / len(self._moves)))
+        if len(self._moves) < 1:
+            return False
+        n = max(20, int(n // len(self._moves)))
         incomplete = False
         for move in self._moves:
             incomplete = move.process(n=n) or incomplete
