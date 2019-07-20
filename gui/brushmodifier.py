@@ -42,7 +42,6 @@ class BrushModifier (object):
         self.bm.mode_changed += self.update_blendmodes
 
     def update_blendmodes(self, bm, old, new):
-        print("Updating blend mode")
         if old is new:
             return
         if old.setting_name:

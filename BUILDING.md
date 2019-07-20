@@ -6,7 +6,7 @@ a stable version of MyPaint.
 
 **Table of Contents**
 
-* [Install libmypaint dependency](#install-libmypaint-dependency)
+* [Install libmypaint and mypaint-brushes](#install-libmypaint-and-mypaint-brushes)
 * [Install third-party dependencies](#install-third-party-dependencies)
   - [Debian and derivatives](#debian-and-derivatives)
   - [Red Hat and derivatives](#red-hat-and-derivatives)
@@ -17,32 +17,43 @@ a stable version of MyPaint.
  * [Running the build script](#running-the-build-script)
    - [Demo mode](#demo-mode)
    - [Managed install and uninstall](#managed-install-and-uninstall)
+   - [Installing locally](#building-and-installing-locally)
  * [Updating to the latest source](#updating-to-the-latest-source)
 
-## Install libmypaint dependency
+## Install libmypaint and mypaint-brushes
 
 MyPaint depends on its brushstroke rendering library,
-[libmypaint](https://github.com/mypaint/libmypaint),
-at version 2.0.0-alpha or later, as well as [mypaint-brushes](https://github.com/mypaint/mypaint-brushes)
-This has to be built from scratch for most systems.
+[**libmypaint**](https://github.com/mypaint/libmypaint),
+at version 2.0.0-alpha or later, as well as the default brush collection
+[**mypaint-brushes**](https://github.com/mypaint/mypaint-brushes).
+These have to be built from scratch for most systems, see the links
+below for details on how to do this.
 
-MyPaint and libmypaint benefit dramatically from autovectorization and other compiler optimizations.
-You may want to set your CFLAGS before compiling (for gcc):
-
-    $ export CFLAGS='-Ofast -ftree-vectorize -fopt-info-vec-optimized -march=native -mtune=native -funsafe-math-optimizations -funsafe-loop-optimizations'
-
-* [Debian-style package builder for libmypaint][LIBDEB]
 * [Generic libmypaint build instructions][LIB]
-* [MyPaint's Ubuntu PPA][PPA]
+* [Generic mypaint-brushes build instructions][BRUSH]
+* [Debian-style package builder for libmypaint][LIBDEB]
+* [MyPaint's Ubuntu PPA (__not currently updated__)][PPA]
 
-Windows [MSYS2](http://msys2.org) users have pre-packaged options
-available:
+Windows [MSYS2](http://msys2.org) users have pre-packaged options available
+for libmypaint-1.3.0 (newer versions currently have to be built from source):
 
     pacman -S mingw-w64-i686-libmypaint
     pacman -S mingw-w64-x86_64-libmypaint
 
+> ### Using optimization flags
+> MyPaint and libmypaint benefit dramatically from autovectorization and other
+> compiler optimizations. You may want to set your CFLAGS before compiling:
+>
+> `
+export CFLAGS='-Ofast -ftree-vectorize -fopt-info-vec-optimized -march=native -mtune=native -funsafe-math-optimizations -funsafe-loop-optimizations'
+`
+>
+> To avoid potential glitches, make sure to compile both libmypaint
+> and MyPaint using the same optimization flags.
+
 [LIBDEB]: https://github.com/mypaint/libmypaint.deb
 [LIB]: https://github.com/mypaint/libmypaint/blob/master/README.md
+[BRUSH]: https://github.com/mypaint/mypaint-brushes/blob/master/README.md
 [PPA]: https://launchpad.net/~achadwick/+archive/ubuntu/mypaint-testing
 
 ## Install third-party dependencies
@@ -58,16 +69,27 @@ installed before you can build it.
 - numpy
 - pycairo (>= 1.4)
 
+Some dependencies have specific versions for Python 2 and Python 3.
+Install the ones for the Python version you will use to build MyPaint.
+Apart from the use of disk space, there is usually no harm in installing
+both sets.
+
 ### Debian and derivatives
 
 For Debian, Mint, or Ubuntu, issue the following commands to install the
 external dependencies.
 
-    sudo apt-get install -y git swig python-setuptools gettext g++
-    sudo apt-get install -y python-dev python-numpy
-    sudo apt-get install -y libgtk-3-dev python-gi-dev
-    sudo apt-get install -y libpng-dev liblcms2-dev libjson-c-dev
-    sudo apt-get install -y gir1.2-gtk-3.0 python-gi-cairo
+    sudo apt-get install -y \
+    git swig gettext g++ gir1.2-gtk-3.0 libgtk-3-dev \
+    libpng-dev liblcms2-dev libjson-c-dev python-gi-dev
+
+    # For python 2
+    sudo apt-get install -y \
+    python-setuptools python-dev python-numpy python-gi-cairo
+
+    # For python 3
+    sudo apt-get install -y \
+    python3-setuptools python3-dev python3-numpy python3-gi-cairo
 
 If this doesn't work, try older names for the development packages, such
 as `libjson0-dev`, or `libpng12-dev`.
@@ -75,13 +97,16 @@ as `libjson0-dev`, or `libpng12-dev`.
 ### Red Hat and derivatives
 
 For yum-enabled systems, the following should work. This has been tested
-on a minimal CentOS 7.3 install.
+on a minimal CentOS 7.3 install, and Fedora 30.
 
-    sudo yum install -y git swig python-setuptools gettext gcc-c++
-    sudo yum install -y python-devel numpy
-    sudo yum install -y gtk3-devel pygobject3-devel
-    sudo yum install -y libpng-devel lcms2-devel json-c-devel
-    sudo yum install -y gtk3 gobject-introspection
+    sudo yum install -y git swig gettext gcc-c++ libpng-devel lcms2-devel \
+    json-c-devel gtk3 gtk3-devel gobject-introspection pygobject3-devel
+
+    # For python 2
+    sudo yum install -y python-setuptools python-devel numpy
+
+    # For python 3
+    sudo yum install -y python3-setuptools python3-devel python3-numpy
 
 ### Windows MSYS2
 
@@ -209,7 +234,8 @@ allows you to do an uninstall later.
     sudo python setup.py managed_install
     sudo python setup.py managed_install --prefix=/usr
 
-The default install location is `/usr/local`.
+The default install location is `/usr/local`. If you want to install
+without sudo, refer to [this section](#building-and-installing-locally)
 
     # You may need to make data files world-readable if you use "sudo"
     sudo find /usr/local -ipath '*mypaint*' -exec chmod -c a+rX {} \;
@@ -220,6 +246,109 @@ The default install location is `/usr/local`.
 
 Note that uninstallation doesn't get rid of all the folders that the
 managed install created.
+
+### Building and installing locally
+
+If you don't want to install MyPaint system-wide, or don't want to use sudo,
+follow these instructions to create a local install.
+
+If you also need to install and configure any
+[third-party dependencies](#install-third-party-dependencies)
+without using sudo, refer to their respective documentation
+for how to do so (for most dependencies, this is **_not recommended_**).
+
+In this section, the shell variable `BASE_DIR` is used to refer
+to the path of a directory which will be the base of your install.
+You can set it like this (modify if you want to install somewhere else):
+```
+BASE_DIR=$HOME/.local/
+```
+
+If you have compatible versions of **libmypaint** and **mypaint-brushes**
+installed and configured, all you have to do is run:
+```
+python setup.py managed_install --prefix=$BASE_DIR
+```
+and jump to the [run instructions](#running-the-local-installation).
+If not, refer to the rest of this section.
+
+#### Installing libmypaint & mypaint-brushes locally
+
+You don't need to install libmypaint or mypaint-brushes **_locally_**
+in order to install MyPaint locally, but if you want to, use the
+`--prefix=` option to `configure` before running `make install`
+for each of them.
+
+E.g:
+```
+./configure --prefix=$BASE_DIR && make install
+```
+
+Refer to [libmypaint's build instructions][LIB]
+for more details on building libmypaint.
+
+#### Configuring, building and installing
+
+If you want to use locally installed versions of **libmypaint**
+and **mypaint-brushes** you will need to make sure that pkg-config
+knows where to find them. To do this, set ```PKG_CONFIG_PATH``` before
+building. Assuming both  **libmypaint** and **mypaint-brushes** were
+installed configured with ```--prefix=$BASE_DIR``` you can do this by running:
+
+```
+export PKG_CONFIG_PATH=$BASE_DIR/lib/pkgconfig/:$BASE_DIR/share/pkgconfig/
+```
+
+> The two colon-separated paths refer to the locations of package configuration
+> files for libmypaint and mypaint-brushes respectively. Replace the respective
+> occurrence of $BASE_DIR if you installed either somewhere else.
+
+In addition to knowing where libmypaint is installed _when building_,
+MyPaint also needs to know its location _when running_. This _can_ be
+done by setting the `LD_LIBRARY_PATH` environment variable to to the
+location of libmypaint every time MyPaint is run, but this is _not_
+recommended. The recommended way is to explicitly run the `build_ext`
+command with the `--set-rpath` flag, prior to installation.
+
+In short, you can build and install by running:
+
+```
+export PKG_CONFIG_PATH=$BASE_DIR/lib/pkgconfig/:$BASE_DIR/share/pkgconfig/
+python setup.py build_ext --set-rpath managed_install --prefix=$BASE_DIR
+```
+
+> **Note**: remember to use the same prefix if uninstalling via `managed_uninstall`
+
+If you have already run the build script without `--set-rpath`,
+you can run the following to force a rebuild:
+```
+python setup.py build_ext --set-rpath --force
+```
+
+> **alternative to `--set-rpath`**
+>
+> If you want to build an older version of MyPaint that did not have this
+> option, you can instead use the built-in `--rpath=` option to `build_ext`,
+> setting the dependency path(s) manually.
+>
+> E.g: `python setup.py build_ext --rpath=$BASE_DIR/lib/`
+
+#### Running the local installation
+
+The start script `mypaint` will be placed in `$BASE_DIR/bin/`, so either add
+that path to your PATH environment variable:
+
+```
+export PATH=$BASE_DIR/bin/:$PATH
+mypaint
+```
+
+or create links to the script:
+
+```
+ln -s $BASE_DIR/bin/mypaint my-local-mypaint
+./my-local-mypaint
+```
 
 ## Updating to the latest source
 

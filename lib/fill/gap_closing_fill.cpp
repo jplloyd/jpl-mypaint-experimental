@@ -356,9 +356,9 @@ GapClosingFiller::unseep(
 
             if (curr_dist == MAX_GAP ||
                 (prev_dist < curr_dist &&
-                 // The 0.7 minimum sqrt delta is set somewhat arbitrarily,
-                 // intended to not stop at slight distance increases
-                 sqrtf((float)curr_dist) - sqrtf((float)prev_dist) > 0.7)) {
+                 // The marked distances are actually squared, hence the
+                 // square root is taken before checking the delta
+                 sqrtf((float)curr_dist) - sqrtf((float)prev_dist) > 1)) {
                 continue;
             }
 

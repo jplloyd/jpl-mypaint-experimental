@@ -82,23 +82,33 @@ class BuildConfig (Command):
 
     """
 
-    description = "build config.py"
-    user_options = []
+    description = "generate lib/config.py using fetched or provided values"
+    user_options = [
+        ("brushdir-path=", None,
+         "use the provided argument as brush directory path"),
+    ]
+
+    WARNING_TEMPLATE = (
+        "# == THIS FILE IS GENERATED ==\n"
+        "# DO NOT EDIT OR ADD TO VERSION CONTROL\n"
+        "# The structure is defined in {input_file}\n"
+        "# The generation is done by the {command_name} command in {script}\n"
+        "\n"
+    )
 
     def initialize_options(self):
-        pass
+        self.brushdir_path = None
 
     def finalize_options(self):
-        pass
+        if self.brushdir_path and self.brushdir_path.strip()[0] == '/':
+            print("WARNING: supplied brush directory path is not relative")
 
     def run(self):
-        try:
-            cmd = ['pkg-config', '--variable=brushesdir', 'mypaint-brushes-2.0']
-            mypaint_brushdir = subprocess.check_output(cmd).decode()
-        except subprocess.CalledProcessError:
-            sys.stderr.write('pkg-config could not find package mypaint-brushes-2.0')
-            sys.exit(os.EX_CANTCREAT)
-        mypaint_brushdir = mypaint_brushdir.strip()
+        if self.brushdir_path is not None:
+            mypaint_brushdir = self.brushdir_path
+        else:
+            mypaint_brushdir = self.pkgconf_brushdir_path()
+
         files = {
             'config.py.in': 'lib/config.py',
         }
@@ -106,6 +116,19 @@ class BuildConfig (Command):
             '@MYPAINT_BRUSHDIR@': mypaint_brushdir,
         }
         self.replace(files, replacements)
+
+    def pkgconf_brushdir_path(self):
+        try:
+            cmd = [
+                'pkg-config', '--variable=brushesdir', 'mypaint-brushes-2.0'
+            ]
+            return subprocess.check_output(cmd).decode().strip()
+        except subprocess.CalledProcessError as e:
+            sys.stderr.write(
+                str(e) +
+                'pkg-config could not find package mypaint-brushes-2.0'
+            )
+            sys.exit(os.EX_CANTCREAT)
 
     def replace(self, files, replacements):
         for f in files:
@@ -116,13 +139,22 @@ class BuildConfig (Command):
                 # Make the necessary replacements.
                 for r in replacements:
                     contents = contents.replace(r, replacements[r])
+                warning = self.WARNING_TEMPLATE.format(
+                    input_file=f,
+                    command_name=self.__class__.__name__,
+                    script=__file__
+                )
                 fd.truncate(0)
                 fd.seek(0)
+                fd.write(warning)
                 fd.write(contents)
                 fd.flush()
                 fd.close()
             except IOError:
-                sys.stderr.write('The script {} failed to update. Check your permissions.'.format(f))
+                sys.stderr.write(
+                    'The script {} failed to update. '
+                    'Check your permissions.'.format(f)
+                )
                 sys.exit(os.EX_CANTCREAT)
 
 
@@ -138,25 +170,49 @@ class Build (build):
     This build also ensures that build_translations is run.
 
     """
-
     sub_commands = (
+        [("build_config", None)] +
         [(a, b) for (a, b) in build.sub_commands if a == 'build_ext'] +
         [(a, b) for (a, b) in build.sub_commands if a != 'build_ext'] +
-        [("build_translations", None)] + [("build_config", None)]
+        [("build_translations", None)]
     )
 
 
 class BuildExt (build_ext):
-    """Custom build_ext (extra --debug flags)."""
+    """Custom build_ext.
+    Adds additional behaviour to --debug option and
+    adds an option to amend the rpath with library paths
+    from dependencies found via pkg-config
+    """
+
+    user_options = [
+        ("set-rpath", "f",
+         "[MyPaint] Add dependency library paths from pkg-config "
+         "to the rpath of mypaintlib (linux only)")
+    ] + build_ext.user_options
+
+    def initialize_options(self):
+        self.set_rpath = False
+        build_ext.initialize_options(self)
+
+    def finalize_options(self):
+        build_ext.finalize_options(self)
+        if self.set_rpath and sys.platform.startswith("linux"):
+            # The directories in runtime_library_dirs will be added
+            # to the linker args as '-Wl,-R{dirs}' This _should_ be
+            # compatible with the --rpath= build_ext option
+            for ext in self.extensions:
+                rt_libs = uniq(ext.library_dirs + ext.runtime_library_dirs)
+                # Retain original list reference, just in case
+                ext.runtime_library_dirs[:] = rt_libs
 
     def build_extension(self, ext):
         ccflags = ext.extra_compile_args
         linkflags = ext.extra_link_args
 
         if self.debug:
-            for flag in ["-DNDEBUG"]:
-                if flag in ccflags:
-                    ccflags.remove(flag)
+            skip = ["-DNDEBUG"]
+            ccflags[:] = [f for f in ccflags if f not in skip]
             ccflags.extend([
                 "-O0",
                 "-g",
@@ -544,11 +600,26 @@ def get_ext_modules():
         pass
     elif sys.platform == "msys":
         pass
-    elif sys.platform == "linux2":
+    elif sys.platform.startswith("linux"):
         # Look up libraries dependencies relative to the library.
         extra_link_args.append('-Wl,-z,origin')
         extra_link_args.append('-Wl,-rpath,$ORIGIN')
 
+    # Ensure that the lib path of libmypaint is added first
+    # to the rpath when the --set-rpath option is used.
+    # For most users this will be the case anyway, due to the
+    # order of the pkg-config output, but this ensures it.
+    mypaintlib_opts = pkgconfig(
+        packages=[
+            "libmypaint-2.0",
+        ],
+        include_dirs=[
+            numpy.get_include(),
+        ],
+        extra_link_args=extra_link_args,
+        extra_compile_args=extra_compile_args,
+    )
+    # Append the info from the rest of the dependencies
     mypaintlib_opts = pkgconfig(
         packages=[
             "pygobject-3.0",
@@ -556,14 +627,9 @@ def get_ext_modules():
             "libpng",
             "lcms2",
             "gtk+-3.0",
-            "libmypaint-2.0",
-            "mypaint-brushes-2.0"
+            "mypaint-brushes-2.0",
         ],
-        include_dirs=[
-            numpy.get_include(),
-        ],
-        extra_link_args=extra_link_args,
-        extra_compile_args=extra_compile_args,
+        **mypaintlib_opts
     )
 
     mypaintlib_swig_opts = ['-Wall', '-noproxydel', '-c++']
@@ -610,7 +676,7 @@ def get_data_files():
     ]
 
     # Paths which can only derived from globbing the source tree.
-    data_file_patts = [
+    data_file_patterns = [
         # SRCDIR, SRCPATT, TARGDIR
         ("desktop/icons", "hicolor/*/*/*", "icons"),
         ("backgrounds", "*.*", "mypaint/backgrounds"),
@@ -618,10 +684,10 @@ def get_data_files():
         ("palettes", "*.gpl", "mypaint/palettes"),
         ("pixmaps", "*.png", "mypaint/pixmaps"),
     ]
-    for (src_pfx, src_patt, targ_pfx) in data_file_patts:
-        for src_file in glob.glob(os.path.join(src_pfx, src_patt)):
-            file_rel = os.path.relpath(src_file, src_pfx)
-            targ_dir = os.path.join(targ_pfx, os.path.dirname(file_rel))
+    for (src_prefix, src_pattern, targ_prefix) in data_file_patterns:
+        for src_file in glob.glob(os.path.join(src_prefix, src_pattern)):
+            file_rel = os.path.relpath(src_file, src_prefix)
+            targ_dir = os.path.join(targ_prefix, os.path.dirname(file_rel))
             data_files.append((targ_dir, [src_file]))
 
     return data_files

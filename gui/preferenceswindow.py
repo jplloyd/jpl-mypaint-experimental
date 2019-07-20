@@ -329,4 +329,3 @@ class PreferencesWindow (windowing.Dialog):
     def blink_layers_toggled_cb(self, checkbut):
         blink = bool(checkbut.get_active())
         self.app.preferences["ui.blink_layers"] = blink
-

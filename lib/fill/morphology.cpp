@@ -308,7 +308,6 @@ morph_strand(
         update_input = result.first;
 
         // Add morphed tile unless it is completely transparent
-
         bool empty_result = result.second == ConstTiles::ALPHA_TRANSPARENT();
         bool full_result = result.second == ConstTiles::ALPHA_OPAQUE();
 

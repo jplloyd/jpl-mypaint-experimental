@@ -12,7 +12,7 @@ from lib.observable import event
 class BlendMode(object):
     """A local on-off switch for a blend mode, with a change event"""
 
-    def __init__(self, name, setting_name, active = False):
+    def __init__(self, name, setting_name, active=False):
         self.name = name
         self.setting_name = setting_name
         self._active = active
@@ -38,7 +38,7 @@ class BlendMode(object):
 class BlendModes(object):
     """Proxy values for tools with individual blend mode states
 
-    Used by tool modes to mantain their own instances of active
+    Used by tool modes to maintain their own instances of active
     blend modes and blend mode history.
 
     In order to enable individual blend modes for a tool mode,

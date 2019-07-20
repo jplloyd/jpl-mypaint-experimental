@@ -9,12 +9,11 @@
 
 """Flood fill tool"""
 
-## Imports
+# Imports
 from __future__ import division, print_function
 
 import weakref
 from gi.repository import Gtk
-from gi.repository import Gdk
 from gi.repository import Pango
 from gi.repository import GLib
 from gettext import gettext as _
@@ -35,13 +34,14 @@ import lib.layer
 import lib.modes
 
 
-## Class defs
+# Class defs
 
-class FloodFillMode (gui.mode.ScrollableModeMixin,
-                     gui.mode.DragMode):
+
+class FloodFillMode (
+        gui.mode.ScrollableModeMixin, gui.mode.DragMode):
     """Mode for flood-filling with the current brush color"""
 
-    ## Class constants
+    # Class constants
 
     ACTION_NAME = "FloodFillMode"
     GC_ACTION_NAME = "FloodFillGCMode"
@@ -96,7 +96,7 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
     def get_current_cursor(self):
         return self._MODE_CURSORS[self.bm.active_mode.mode_type]
 
-    ## Method defs
+    # Method defs
 
     def enter(self, doc, **kwds):
         super(FloodFillMode, self).enter(doc, **kwds)
@@ -246,21 +246,6 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
         )
         opts.make_new_layer = False
 
-    def key_press_cb(self, win, tdw, event):
-        timeout = 500
-        t = event.time
-        (old_t, k) = self._prev_release
-        if t - old_t < timeout and k == event.keyval:
-            if k == Gdk.KEY_Shift_L:
-                self.get_options_widget().flip_gap_closing()
-            elif k == Gdk.KEY_Control_L:
-                self.get_options_widget().flip_use_src_layer()
-            elif k == Gdk.KEY_Alt_L:
-                self.get_options_widget().flip_sample_merged()
-            self._update_ui()
-            t -= 500
-        self._prev_release = (t, event.keyval)
-
     def motion_notify_cb(self, tdw, event):
         """Track position, and update cursor"""
         x, y = tdw.display_to_model(event.x, event.y)
@@ -311,6 +296,7 @@ class FloodFillMode (gui.mode.ScrollableModeMixin,
                 tdw.set_override_cursor(self.cursor)
 
     # Mode options
+
     def get_options_widget(self):
         """Get the (class singleton) options widget"""
         cls = self.__class__
@@ -331,8 +317,8 @@ def status_callback(handler):
     # Prevent escape release (always) triggering mode stack popping
     app.kbm.enabled = False
 
-    # Create new dialog for each occurence, hopefully
-    # occurences are rare enough for it not to matter very much.
+    # Create new dialog for each occurrence, hopefully
+    # occurrences are rare enough for it not to matter very much.
     status_dialog = Gtk.MessageDialog(
         parent=app.drawWindow, buttons=Gtk.ButtonsType.CANCEL)
 
@@ -827,33 +813,6 @@ class FloodFillOptionsWidget (Gtk.Grid):
         self.bm = self.get_blend_modes()
         self.bm.mode_changed += self.update_blend_mode
 
-    def flip_gap_closing(self):
-        """Turn gap closing on or off depending on its current status"""
-        self._gap_closing_toggle.set_active(not self.gap_closing)
-
-    def flip_use_src_layer(self):
-        """Flip between using the default src layer and previous choice"""
-        prev = self._prev_src_layer
-        if not (prev and prev() and prev().root):
-            return
-        index = self._layer_index(prev())
-        combo = self._src_combo
-        choice = 0 if combo.get_active() == index else index
-        with combo.handler_block(self._combo_cb_id):
-            combo.set_active(choice)
-
-    def flip_sample_merged(self):
-        """Turn sample merged on or off depending on its current status"""
-        self._sample_merged_toggle.set_active(not self.sample_merged)
-
-    def _layer_index(self, layer):
-        """Linear fetch for layer index in src selection combobox
-        Returns None if the layer is not contained in any row.
-        """
-        for i, entry in enumerate(self._src_combo.get_model()):
-            if entry[2] is layer:
-                return i
-
     # Fill blend modes
     def get_blend_modes(self):
         """Get the (class singleton) blend modes manager"""
@@ -967,12 +926,8 @@ class FloodFillOptionsWidget (Gtk.Grid):
         """
         layer = root.deepget(path)
         if layer and self._prev_src_layer and self._prev_src_layer() is layer:
-            # Restore previous layer selection
+            # Restore previous selection layer
             combo = self._src_combo
-            index = self._layer_index(layer)
-            if index:
-                with combo.handler_block(self._src_combo_cb_id):
-                    combo.set_active(index)
             for entry in combo.get_model():
                 if entry[2] is layer:
                     # Don't trigger callback
