@@ -19,10 +19,33 @@ from setuptools import setup
 from setuptools import Extension
 from setuptools import Command
 from setuptools.command.build_ext import build_ext
+from setuptools.command.install import install
 from setuptools.command.install_scripts import install_scripts
+
+# Constants
+
+
+# Some versions of clang requires different flag configurations than gcc
+# to link correctly, so we enable configuration via environemnt variables.
+OPENMP_CFLAG = os.getenv("OPENMP_CFLAG", "-fopenmp")
+OPENMP_LDFLAG = os.getenv("OPENMP_LDFLAG", "-fopenmp")
 
 
 # Helper classes and routines:
+
+
+def pkgconf():
+    """Returns the name used to execute pkg-config
+    Uses the value of the PKG_CONFIG environment variable if it is set.
+    """
+    return os.getenv("PKG_CONFIG", "pkg-config")
+
+
+def msgfmt():
+    """Returns the name used to execute msgfmt
+    """
+    return os.getenv("MSGFMT", "msgfmt")
+
 
 class BuildTranslations (Command):
     """Builds binary message catalogs for installation.
@@ -33,7 +56,30 @@ class BuildTranslations (Command):
 
     """
 
+    @staticmethod
+    def get_translation_paths(command):
+        """Returns paths for building and installing message catalogs
+
+        The returned data is a tuple with two lists.
+        The first contains (source, destination) pairs for building
+        *.mo files from *.po files (relative paths).
+        The second contains (gen_mo_src_dir, [mo_target_path]) tuples
+        that are used by the 'install' command.
+        """
+        tmpdir = command.get_finalized_command("build").build_temp
+
+        msg_path_pairs = []
+        data_path_pairs = []
+        for po_path in glob.glob("po/*.po"):
+            lang = os.path.basename(po_path)[:-3]
+            mo_dir = os.path.join("locale", lang, "LC_MESSAGES")
+            targ = os.path.join(tmpdir, mo_dir, "mypaint.mo")
+            msg_path_pairs.append((po_path, targ))
+            data_path_pairs.append((mo_dir, [targ]))
+        return (msg_path_pairs, data_path_pairs)
+
     description = "build binary message catalogs (*.mo)"
+
     user_options = []
 
     def initialize_options(self):
@@ -43,35 +89,29 @@ class BuildTranslations (Command):
         pass
 
     def run(self):
-        build = self.get_finalized_command("build")
-        for src in glob.glob("po/*.po"):
-            data_files = self._compile_message_catalog(src, build.build_temp)
-            if not self.dry_run:
-                self.distribution.data_files.extend(data_files)
+        msg_paths, data_paths = BuildTranslations.get_translation_paths(self)
+        for po_path, mo_path in msg_paths:
+            self._compile_message_catalog(po_path, mo_path)
+        if not self.dry_run:
+            self.distribution.data_files.extend(data_paths)
 
-    def _compile_message_catalog(self, src, temp):
-        lang = os.path.basename(src)[:-3]
-        targ_dir = os.path.join(temp, "locale", lang, "LC_MESSAGES")
-        targ = os.path.join(targ_dir, "mypaint.mo")
-        install_dir = os.path.join("locale", lang, "LC_MESSAGES")
-
-        needs_update = True
-        if os.path.exists(targ):
-            if os.stat(targ).st_mtime >= os.stat(src).st_mtime:
-                needs_update = False
+    def _compile_message_catalog(self, po_file_path, mo_file_path):
+        needs_update = not (
+            os.path.exists(mo_file_path) and
+            os.stat(mo_file_path).st_mtime >=
+            os.stat(po_file_path).st_mtime
+        )
 
         if needs_update:
-            cmd = ("msgfmt", src, "-o", targ)
+            cmd = (msgfmt(), po_file_path, "-o", mo_file_path)
             if self.dry_run:
                 self.announce("would run %s" % (" ".join(cmd),), level=2)
-                return []
-            self.announce("running %s" % (" ".join(cmd),), level=2)
+            else:
+                self.announce("running %s" % (" ".join(cmd),), level=2)
+                self.mkpath(os.path.dirname(mo_file_path))
+                subprocess.check_call(cmd)
 
-            self.mkpath(targ_dir)
-            subprocess.check_call(cmd)
-
-        assert os.path.exists(targ)
-        return [(install_dir, [targ])]
+                assert os.path.exists(mo_file_path)
 
 
 class BuildConfig (Command):
@@ -120,7 +160,7 @@ class BuildConfig (Command):
     def pkgconf_brushdir_path(self):
         try:
             cmd = [
-                'pkg-config', '--variable=brushesdir', 'mypaint-brushes-2.0'
+                pkgconf(), '--variable=brushesdir', 'mypaint-brushes-2.0'
             ]
             return subprocess.check_output(cmd).decode().strip()
         except subprocess.CalledProcessError as e:
@@ -188,11 +228,14 @@ class BuildExt (build_ext):
     user_options = [
         ("set-rpath", "f",
          "[MyPaint] Add dependency library paths from pkg-config "
-         "to the rpath of mypaintlib (linux only)")
+         "to the rpath of mypaintlib (linux only)"),
+        ("disable-openmp", None,
+         "Don't use openmp, even if the platform supports it."),
     ] + build_ext.user_options
 
     def initialize_options(self):
         self.set_rpath = False
+        self.disable_openmp = False
         build_ext.initialize_options(self)
 
     def finalize_options(self):
@@ -210,6 +253,10 @@ class BuildExt (build_ext):
         ccflags = ext.extra_compile_args
         linkflags = ext.extra_link_args
 
+        if sys.platform != "darwin" and not self.disable_openmp:
+            linkflags.append(OPENMP_CFLAG)
+            ccflags.append(OPENMP_LDFLAG)
+
         if self.debug:
             skip = ["-DNDEBUG"]
             ccflags[:] = [f for f in ccflags if f not in skip]
@@ -226,6 +273,20 @@ class BuildExt (build_ext):
             ccflags.append("-O3")
 
         return build_ext.build_extension(self, ext)
+
+
+class Install (install):
+    """Custom install to handle translation files
+    Same options as the regular install command.
+    """
+
+    def run(self):
+        # Without this, using --skip-build will result in the locale
+        # files not being installed, even if they have been generated.
+        if "build_translations" not in self.distribution.have_run:
+            data_paths = BuildTranslations.get_translation_paths(self)[1]
+            self.distribution.data_files.extend(data_paths)
+        install.run(self)
 
 
 class Clean (clean):
@@ -553,7 +614,7 @@ def pkgconfig(packages, **kwopts):
         "--cflags": "extra_compile_args",
     }
     for (pc_arg, extras_key) in extra_args_map.items():
-        cmd = ["pkg-config", pc_arg] + list(packages)
+        cmd = [pkgconf(), pc_arg] + list(packages)
         cmd_output = subprocess.check_output(
             cmd,
             universal_newlines=True,
@@ -589,10 +650,6 @@ def get_ext_modules():
         '-g',  # always include symbols, for profiling
     ]
     extra_link_args = []
-
-    if sys.platform != "darwin":
-        extra_link_args.append("-fopenmp")
-        extra_compile_args.append("-fopenmp")
 
     if sys.platform == "darwin":
         pass
@@ -715,6 +772,7 @@ setup(
         "build_translations": BuildTranslations,
         "build_config": BuildConfig,
         "demo": Demo,
+        "install": Install,
         "managed_install": ManagedInstall,
         "managed_uninstall": ManagedUninstall,
         "install_scripts": InstallScripts,
