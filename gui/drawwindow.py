@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of MyPaint.
-# Copyright (C) 2007-2018 by the MyPaint Development Team.
+# Copyright (C) 2007-2019 by the MyPaint Development Team.
 # Copyright (C) 2007-2014 by Martin Renold <martinxyz@gmx.ch>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -697,7 +697,7 @@ class DrawWindow (Gtk.Window):
 
     def import_brush_pack_cb(self, *junk):
         format_id, filename = dialogs.open_dialog(
-            _("Import brush package..."), self,
+            _(u"Import brush package…"), self,
             [(_("MyPaint brush package (*.zip)"), "*.zip")]
         )
         if not filename:

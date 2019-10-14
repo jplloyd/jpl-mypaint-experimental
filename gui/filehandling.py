@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # This file is part of MyPaint.
-# Copyright (C) 2009-2018 by the MyPaint Development Team
+# Copyright (C) 2009-2019 by the MyPaint Development Team
 # Copyright (C) 2007-2014 by Martin Renold <martinxyz@gmx.ch>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -207,9 +207,10 @@ class _IOProgressUI:
         :rtype: unicode/str
 
         """
-        # TRANSLATORS: formatting for the {files_summary} used below.
         if isinstance(f, tuple) or isinstance(f, list):
             nfiles = len(f)
+            # TRANSLATORS: formatting for {files_summary} for multiple files.
+            # TRANSLATORS: corresponding msgid for single files: "“{basename}”"
             return ngettext(u"{n} file", u"{n} files", nfiles).format(
                 n=nfiles,
             )
@@ -571,9 +572,15 @@ class FileHandler (object):
 
     def init_save_dialog(self, export):
         if export:
-            save_dialog_name = C_("Dialogs: Save As...", u"Export")
+            save_dialog_name = C_(
+                "Dialogs (window title): File→Export…",
+                u"Export"
+            )
         else:
-            save_dialog_name = C_("Dialogs: Save As...", u"Save")
+            save_dialog_name = C_(
+                "Dialogs (window title): File→Save As…",
+                u"Save As"
+            )
         dialog = Gtk.FileChooserDialog(
             save_dialog_name,
             self.app.drawWindow,
@@ -591,7 +598,7 @@ class FileHandler (object):
         box = Gtk.HBox()
         box.set_spacing(12)
         label = Gtk.Label(C_(
-            "save dialogs: formats and options: label",
+            "save dialogs: formats and options: (label)",
             u"Format to save as:",
         ))
         label.set_alignment(0.0, 0.5)
@@ -725,7 +732,7 @@ class FileHandler (object):
             file_basename = None
         warning_msg_tmpl = C_(
             "Destructive action confirm dialog: warning message",
-            u"You risk losing {abbreviated_time} of unsaved painting. "
+            u"You risk losing {abbreviated_time} of unsaved painting."
         )
         markup_tmpl = warning_msg_tmpl
         d.set_markup(markup_tmpl.format(
@@ -1048,7 +1055,7 @@ class FileHandler (object):
         dialog = Gtk.FileChooserDialog(
             C_(
                 "load dialogs: title",
-                u"Open Scratchpad...",
+                u"Open Scratchpad…",
             ),
             self.app.drawWindow,
             Gtk.FileChooserAction.OPEN,

@@ -19,12 +19,14 @@ import logging
 import warnings
 
 import lib.gichecks
-from gi.repository import Gtk
 from gi.repository import GdkPixbuf
 from optparse import OptionParser
 
-from lib.meta import MYPAINT_VERSION
+import lib.config
 import lib.glib
+from lib.i18n import USER_LOCALE_PREF
+from lib.meta import MYPAINT_VERSION
+import gui.userconfig
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +52,46 @@ def _init_gtk_workarounds():
                 )
                 setattr(cls, name, func)
 
+    # Wayland "workaround" to avoid input freeze on pointer grabs.
+    # Respect existing envvars for testing (and general courtesy).
+    # This relies on XWayland being available.
+    if sys.platform.startswith("linux") and 'GDK_BACKEND' not in os.environ:
+        os.environ['GDK_BACKEND'] = 'x11'
+
     logger.debug("GTK workarounds added.")
 
 
-def main(datapath, iconspath, oldstyle_confpath=None, version=MYPAINT_VERSION):
+def set_user_configured_locale(userconfpath):
+    """If configured, set envvars for a custom locale
+    The user can choose to not use their system locale
+    by explicitly choosing another, and restarting.
+    """
+    settings = gui.userconfig.get_json_config(userconfpath)
+    if USER_LOCALE_PREF in settings:
+        user_locale = settings[USER_LOCALE_PREF]
+        supported = ["en", "en_US"] + lib.config.supported_locales
+        if user_locale not in supported:
+            logger.warning("Locale not supported: %s", user_locale)
+        else:
+            # GIMP, Krita and Inkscape will all ignore the LANGUAGE
+            # variable when a user has chosen a language explicitly.
+            # For better or worse, we follow their example
+            # (this may change in the future).
+            logger.info("Using locale: (%s)", user_locale)
+            if "LANGUAGE" in os.environ:
+                logger.warning("LANGUAGE envvar is overridden by user setting")
+            os.environ["LANGUAGE"] = user_locale
+    else:
+        logger.info("No locale setting found, using system locale")
+
+
+def main(
+        datapath,
+        iconspath,
+        localepath,
+        oldstyle_confpath=None,
+        version=MYPAINT_VERSION,
+):
     """Run MyPaint with `sys.argv_unicode`, called from the "mypaint" script.
 
     :param unicode datapath: The app's read-only data location.
@@ -93,48 +131,7 @@ def main(datapath, iconspath, oldstyle_confpath=None, version=MYPAINT_VERSION):
     # with non-ASCII character in %USERPROFILE% will break.
     lib.glib.init_user_dir_caches()
 
-    # mypaintlib import is performed first in gui.application now.
-    from gui import application
-
-    # Default logfile basename.
-    # If it's relative, it's resolved relative to the user config path.
-    default_logfile = None
-
-    # Parse command line
-    parser = OptionParser('usage: %prog [options] [FILE]')
-    parser.add_option(
-        '-c',
-        '--config',
-        metavar='DIR',
-        default=oldstyle_confpath,
-        help='use old-style merged config directory DIR, e.g. ~/.mypaint'
-    )
-    parser.add_option(
-        '-l',
-        '--logfile',
-        metavar='FILE',
-        default=default_logfile,
-        help='log console messages to FILE (rel. to config location)'
-    )
-    parser.add_option(
-        '-t',
-        '--trace',
-        action="store_true",
-        help='print all executed Python statements'
-    )
-    parser.add_option(
-        '-f',
-        '--fullscreen',
-        action="store_true",
-        help='start in fullscreen mode'
-    )
-    parser.add_option(
-        "-V",
-        '--version',
-        action="store_true",
-        help='print version information and exit'
-    )
-    options, args = parser.parse_args(sys.argv_unicode[1:])
+    options, args = parsed_cmdline_arguments(oldstyle_confpath)
 
     # XDG support for new users on POSIX platforms
     if options.config is None:
@@ -178,6 +175,16 @@ def main(datapath, iconspath, oldstyle_confpath=None, version=MYPAINT_VERSION):
         logger.debug('user_datapath: %r', userdatapath)
         logger.debug('user_confpath: %r', userconfpath)
 
+        # User-configured locale (if enabled by user)
+        set_user_configured_locale(userconfpath)
+
+        # Locale setting
+        from lib.gettext_setup import init_gettext
+        init_gettext(localepath)
+
+        # mypaintlib import is performed first in gui.application now.
+        from gui import application
+
         app_state_dirs = application.StateDirs(
             app_data = datapath,
             app_icons = iconspath,
@@ -191,6 +198,10 @@ def main(datapath, iconspath, oldstyle_confpath=None, version=MYPAINT_VERSION):
             fullscreen = options.fullscreen,
         )
 
+        # Gtk must not be imported before init_gettext
+        # has been run - else locales will not be set
+        # up properly (e.g: left-to-right interfaces for right-to-left scripts)
+        from gi.repository import Gtk
         settings = Gtk.Settings.get_default()
         dark = app.preferences.get("ui.dark_theme_variant", True)
         settings.set_property("gtk-application-prefer-dark-theme", dark)
@@ -212,3 +223,45 @@ def main(datapath, iconspath, oldstyle_confpath=None, version=MYPAINT_VERSION):
         tracer.runfunc(run)
     else:
         run()
+
+
+def parsed_cmdline_arguments(default_confpath):
+    """Parse command line arguments and return result
+
+    :return: (options, positional arguments)
+    """
+    parser = OptionParser('usage: %prog [options] [FILE]')
+    parser.add_option(
+        '-c',
+        '--config',
+        metavar='DIR',
+        default=default_confpath,
+        help='use old-style merged config directory DIR, e.g. ~/.mypaint'
+    )
+    parser.add_option(
+        '-l',
+        '--logfile',
+        metavar='FILE',
+        default=None,
+        help='log console messages to FILE (rel. to config location)'
+    )
+    parser.add_option(
+        '-t',
+        '--trace',
+        action="store_true",
+        help='print all executed Python statements'
+    )
+    parser.add_option(
+        '-f',
+        '--fullscreen',
+        action="store_true",
+        help='start in fullscreen mode'
+    )
+    parser.add_option(
+        "-V",
+        '--version',
+        action="store_true",
+        help='print version information and exit'
+    )
+
+    return parser.parse_args(sys.argv_unicode[1:])
