@@ -181,6 +181,10 @@
         <menuitem action='Purer'/>
         <menuitem action='Grayer'/>
       </menu>
+      <menu action="PigmentDefaultsMenu">
+	<menuitem action='PigmentOnByDefault'/>
+	<menuitem action='PigmentOffByDefault'/>
+      </menu>
       <!-- Palette -->
       <separator/>
       <menuitem action='PalettePrev'/>
