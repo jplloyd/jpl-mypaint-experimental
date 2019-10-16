@@ -185,6 +185,10 @@
 	<menuitem action='HSVModel'/>
 	<menuitem action='HCYModel'/>
       </menu>
+      <menu action="PigmentDefaultsMenu">
+	<menuitem action='PigmentOnByDefault'/>
+	<menuitem action='PigmentOffByDefault'/>
+      </menu>
       <!-- Palette -->
       <separator/>
       <menuitem action='PalettePrev'/>
