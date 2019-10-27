@@ -141,7 +141,7 @@ def main(datapath, iconspath, oldstyle_confpath=None, version=MYPAINT_VERSION):
 
     # XDG support for new users on POSIX platforms
     if options.config is None:
-        appsubdir = u"mypaint"
+        appsubdir = u"mypaint-legacy-v1.2.1"
         basedir = lib.glib.get_user_data_dir()
         userdatapath = os.path.join(basedir, appsubdir)
         basedir = lib.glib.get_user_config_dir()
