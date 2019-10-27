@@ -451,6 +451,9 @@ if __name__ == '__main__':
     except NameError:
         version = None
 
+    # Prevent freezes on Wayland
+    os.environ['GDK_BACKEND'] = 'x11'
+
     # Start the app.
     from gui import main
     main.main(datapath, iconspath, old_confpath, version=version)
