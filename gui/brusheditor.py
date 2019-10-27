@@ -138,6 +138,8 @@ class BrushEditorWindow (SubWindow):
     def _build_ui(self):
         """Builds the UI from ``brusheditor.glade``"""
         ui_dir = os.path.dirname(os.path.abspath(__file__))
+        if self.app:
+            ui_dir = os.path.join(self.app.datapath, "gui")
         ui_path = os.path.join(ui_dir, self._UI_DEFINITION_FILE)
         ui_fp = open(ui_path, 'r')
         ui_xml = ui_fp.read()

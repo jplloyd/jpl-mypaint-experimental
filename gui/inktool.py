@@ -1077,6 +1077,8 @@ class OptionsPresenter (object):
         if self._options_grid is not None:
             return
         builder_xml = os.path.splitext(__file__)[0] + ".glade"
+        builder_xml = os.path.basename(builder_xml)
+        builder_xml = os.path.join(self._app.datapath, "gui", builder_xml)
         builder = Gtk.Builder()
         builder.set_translation_domain("mypaint")
         builder.add_from_file(builder_xml)
