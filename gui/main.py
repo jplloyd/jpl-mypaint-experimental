@@ -135,7 +135,7 @@ def main(
 
     # XDG support for new users on POSIX platforms
     if options.config is None:
-        appsubdir = u"mypaint"
+        appsubdir = u"jpl-mypaint"
         basedir = lib.glib.get_user_data_dir()
         userdatapath = os.path.join(basedir, appsubdir)
         basedir = lib.glib.get_user_config_dir()
