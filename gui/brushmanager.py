@@ -209,7 +209,8 @@ class BrushManager (object):
         super(BrushManager, self).__init__()
 
         # Default pigment setting when not specified by the brush
-        self.pigment_by_default = True
+        self.pigment_by_default = None
+
         self.stock_brushpath = stock_brushpath
         self.user_brushpath = user_brushpath
         self.app = app
@@ -577,12 +578,11 @@ class BrushManager (object):
 
     def set_pigment_by_default(self, pigment_by_default):
         if self.pigment_by_default != pigment_by_default:
+            msg = "Switching default pigment setting to {state}"
+            logger.info(msg.format(
+                state="On" if pigment_by_default else "Off"))
             self.pigment_by_default = pigment_by_default
-            self._reset_pigment_setting
-
-    def _pigment_default_radioaction_changed_cb(self, old_action, new_action):
-        prop = new_action.get_property("value") == 0
-        self.pigment_by_default = prop
+            self._reset_pigment_setting()
 
     def _reset_pigment_setting(self):
         appbrush = ()

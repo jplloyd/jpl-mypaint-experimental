@@ -30,6 +30,8 @@ from lib import helpers
 from lib import fileutils
 from lib.errors import FileHandlingError
 from lib.errors import AllocationError
+import gui.compatibility
+from gui.compatibility import CompatFileBehavior as CFB, C1X, C2X
 from gui.widgets import with_wait_cursor
 from lib import mypaintlib
 from lib.gettext import ngettext
@@ -805,6 +807,7 @@ class FileHandler (object):
         )
         if not ok_to_start_new_doc:
             return
+        self.app.reset_compat_mode()
         self.doc.reset_background()
         self.doc.model.clear()
         self.filename = None
@@ -816,10 +819,10 @@ class FileHandler (object):
         while Gtk.events_pending():
             Gtk.main_iteration()
 
-    def open_file(self, filename):
+    def open_file(self, filename, **kwargs):
         """Load a file, replacing the current working document."""
         if not self._call_doc_load_method(self.doc.model.load, filename,
-                                          False):
+                                          False, **kwargs):
             return
 
         self.filename = os.path.abspath(filename)
@@ -847,7 +850,27 @@ class FileHandler (object):
             return
         logger.info('Imported layers from %r', filenames)
 
-    def _call_doc_load_method(self, method, arg, is_import):
+    def _compat_handler(self, eotf_value, root_stack_elem):
+        default = self.app.preferences[gui.compatibility.DEFAULT_COMPAT]
+        if eotf_value is not None:
+            try:
+                eotf_value = float(eotf_value)
+                compat = C1X if eotf_value == 1.0 else C2X
+            except ValueError:
+                msg = "Invalid eotf: {eotf}, using default compat mode!"
+                logger.warning(msg.format(eotf=eotf_value))
+                eotf_value = None
+                compat = default
+        else:
+            logging.info("No eotf value specified in openraster file")
+            # Depending on user settings, decide whether to
+            # use the default value for the eotf, or the legacy value of 1.0
+            setting = self.app.preferences[CFB.SETTING]
+            compat = CFB.get_compat_mode(setting, root_stack_elem, default)
+        self.app.set_compat_mode(compat, custom_eotf=eotf_value)
+
+    def _call_doc_load_method(
+            self, method, arg, is_import, compat_handler=None):
         """Internal: common GUI aspects of loading or importing files.
 
         Calls a document model loader method (on lib.document.Document)
@@ -855,6 +878,8 @@ class FileHandler (object):
         shows appropriate error messages.
 
         """
+        if not compat_handler:
+            compat_handler = self._compat_handler
         prefs = self.app.preferences
         display_colorspace_setting = prefs["display.colorspace"]
 
@@ -865,6 +890,7 @@ class FileHandler (object):
         ioui.call(
             method, arg,
             convert_to_srgb=(display_colorspace_setting == "srgb"),
+            compat_handler=compat_handler
         )
         return ioui.success
 

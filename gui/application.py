@@ -48,10 +48,12 @@ import lib.observable
 import lib.cache
 import lib.document
 import lib.eotf
+import lib.modes
 from lib import brush
 from lib import helpers
 from lib import mypaintlib
 from lib import brushsettings
+import gui.compatibility as compat
 import gui.device
 from . import filehandling
 from . import keyboard
@@ -276,9 +278,10 @@ class Application (object):
         self._preferences = lib.observable.ObservableDict()
         self.load_settings()
 
-        # Initiate eotf
-        lib.eotf.set_eotf(self.eotf_default)
-        lib.eotf.set_base_eotf(self.eotf_default)
+        # Set up compatibility mode (most of it)
+        self.compat_mode = None
+        self.reset_compat_mode(update=False)
+        self.update_default_layer_type()
 
         # Unmanaged main brush.
         # Always the same instance (we can attach settings_observers).
@@ -347,11 +350,13 @@ class Application (object):
         scratchpad_tdw.set_model(scratchpad_model)
         self.scratchpad_doc = document.Document(self, scratchpad_tdw,
                                                 scratchpad_model)
+
         self.brushmanager = brushmanager.BrushManager(
             lib.config.mypaint_brushdir,
             join(self.state_dirs.user_data, 'brushes'),
             self,
         )
+
         signal_callback_objs.append(self.filehandler)
         self.brushmodifier = brushmodifier.BrushModifier(self)
         signal_callback_objs.append(self.brushmodifier)
@@ -444,21 +449,18 @@ class Application (object):
         """
         return lib.eotf.eotf()
 
-    @property
-    def eotf_default(self):
-        """Electro-optical transfer function default value
-
-        This is the default value in terms of user settings,
-        it is session-default, but not necessarily constant.
-        """
-        return self._preferences.get(
-            'display.colorspace_EOTF', lib.eotf.DEFAULT_EOTF
-        )
+    @eotf.setter
+    def eotf(self, new_eotf):
+        lib.eotf.set_eotf(new_eotf)
 
     def _at_application_start(self, filenames, fullscreen):
         col = self.brush_color_manager.get_color()
         self.brushmanager.select_initial_brush()
         self.brush_color_manager.set_color(col)
+
+        # Complete the compatibility mode setup
+        self.update_default_pigment_setting()
+
         if filenames:
             # Open only the first file, no matter how many has been specified
             # If the file does not exist just set it as the file to save to
@@ -534,6 +536,53 @@ class Application (object):
             # old config file; users who never assigned any buttons would
             # end up with Ctrl-Click color picker broken after upgrade
             self.preferences[key] = default_config[key]
+
+    def reset_compat_mode(self, update=True):
+        self.set_compat_mode(
+            self.preferences[compat.DEFAULT_COMPAT], update=update)
+
+    def set_compat_mode(self, compat_mode, custom_eotf=None, update=True):
+        changed = compat_mode != self.compat_mode
+        if compat_mode not in {compat.C1X, compat.C2X}:
+            compat_mode = compat.C2X
+            changed = self.compat_mode != compat_mode
+            msg = "Unknown compatibility mode: '{mode}'! Using 2.x instead."
+            logger.warning(msg.format(mode=compat_mode))
+        # Save scratchpad (shoddy solution, alternative is to transform
+        # the scratchpad's tiles and strokemap based on the eotf change)
+        if changed and update:
+            self.drawWindow.save_current_scratchpad_cb(None)
+        # Change eotf and set new compat mode
+        if compat_mode == compat.C1X:
+            logger.info("Setting mode to 1.x (legacy)")
+            self.eotf = 1.0
+        else:
+            logger.info("Setting mode to 2.x (standard)")
+            self.eotf = custom_eotf or lib.eotf.base_eotf()
+        self.compat_mode = compat_mode
+        # Reload scratchpad
+        if changed and update:
+            self.drawWindow.revert_current_scratchpad_cb(None)
+        if update:
+            self.update_default_layer_type()
+            self.update_default_pigment_setting()
+
+    def update_default_layer_type(self):
+        prefs = self.preferences
+        mode_settings = prefs[compat.COMPAT_SETTINGS][self.compat_mode]
+        if mode_settings[compat.PIGMENT_LAYER_BY_DEFAULT]:
+            logger.info("Setting default layer type to Pigment")
+            lib.modes.set_default_mode(mypaintlib.CombineSpectralWGM)
+        else:
+            logger.info("Setting default layer type to Normal")
+            lib.modes.set_default_mode(mypaintlib.CombineNormal)
+
+    def update_default_pigment_setting(self):
+        prefs = self.preferences
+        mode_settings = prefs[compat.COMPAT_SETTINGS][self.compat_mode]
+        self.brushmanager.set_pigment_by_default(
+            mode_settings[compat.PIGMENT_BY_DEFAULT]
+        )
 
     def add_action_group(self, ag):
         self.ui_manager.insert_action_group(ag, -1)
