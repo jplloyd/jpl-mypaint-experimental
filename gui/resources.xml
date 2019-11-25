@@ -1017,31 +1017,6 @@ Vocabulary
           <!-- NO TOOLTIP OR SHORTCUT: this is a menu -->
         </object>
       </child>
-      <!-- {{{ Pigment defaults submenu -->
-      <child>
-        <object class="GtkAction" id="PigmentDefaultsMenu">
-          <property name="label" translatable="yes" context="Menu→Color (labels)">Pigment options</property>
-          <!-- NO TOOLTIP OR SHORTCUT: this is a menu -->
-        </object>
-      </child>
-      <child>
-        <object class="GtkRadioAction" id="PigmentOnByDefault">
-          <property name="label" translatable="yes" context="Menu→Color→Pigment options (labels)">Pigment setting on by default</property>
-          <property name="tooltip" translatable="yes" context="Accel Editor (descriptions)">If a brush does not have the pigment setting set, turn it on.</property>
-          <signal name="changed" handler="_pigment_default_radioaction_changed_cb"/>
-          <property name="current-value">0</property>
-          <property name="value">0</property>
-        </object>
-      </child>
-      <child>
-        <object class="GtkRadioAction" id="PigmentOffByDefault">
-          <property name="label" translatable="yes" context="Menu→Color→Pigment options (labels)">Pigment setting off by default</property>
-          <property name="tooltip" translatable="yes" context="Accel Editor (descriptions)">If a brush does not have the pigment setting set, leave it off.</property>
-          <property name="group">PigmentOnByDefault</property>
-          <property name="value">1</property>
-        </object>
-      </child>
-      <!-- }}} -->
       <child>
         <object class="GtkAction" id="ColorHistoryPopup">
           <property name="label" translatable="yes" context="Menu→Color (labels), Accel Editor (labels)">Color History Popup</property>

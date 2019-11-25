@@ -341,7 +341,6 @@ class Application (object):
             join(self.state_dirs.user_data, 'brushes'),
             self,
         )
-        signal_callback_objs.append(self.brushmanager)
         signal_callback_objs.append(self.filehandler)
         self.brushmodifier = brushmodifier.BrushModifier(self)
         signal_callback_objs.append(self.brushmodifier)

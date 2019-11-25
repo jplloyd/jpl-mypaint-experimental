@@ -190,20 +190,12 @@ class BrushInfo (object):
     """Fully parsed description of a brush.
     """
 
-    def __init__(self, string=None, default_overrides=None):
-        """Construct a BrushInfo object, optionally parsing it.
-
-        :param string: optional json string to load info from
-        :param default_overrides: optional dict of
-        "canonical setting name -> (BrushSettingInfo -> value)" mappings,
-        each used to change the default values of a settings.
-        """
+    def __init__(self, string=None):
+        """Construct a BrushInfo object, optionally parsing it."""
         super(BrushInfo, self).__init__()
         self.settings = {}
-        self.undefined_settings = set()
         self.cache_str = None
         self.observers = []
-        self.default_overrides = default_overrides
         for s in brushsettings.settings:
             self.reset_setting(s.cname)
         self.observers.append(self.settings_changed_cb)
@@ -230,8 +222,6 @@ class BrushInfo (object):
     def load_from_brushinfo(self, other):
         """Updates the brush's Settings from (a clone of) ``brushinfo``."""
         self.settings = copy.deepcopy(other.settings)
-        self.default_overrides = other.default_overrides
-        self.undefined_settings = set(other.undefined_settings)
         for f in self.observers:
             f(ALL_SETTINGS)
         self.cache_str = other.cache_str
@@ -245,13 +235,7 @@ class BrushInfo (object):
         self.end_atomic()
 
     def reset_setting(self, cname):
-        s = brushsettings.settings_dict[cname]
-        if self.default_overrides and cname in self.default_overrides:
-            override = self.default_overrides[cname]
-            basevalue = override(s)
-        else:
-            basevalue = s.default
-
+        basevalue = brushsettings.settings_dict[cname].default
         if cname == 'opaque_multiply':
             # make opaque depend on pressure by default
             input_points = {'pressure': [(0.0, 0.0), (1.0, 1.0)]}
@@ -260,10 +244,6 @@ class BrushInfo (object):
         self.settings[cname] = [basevalue, input_points]
         for f in self.observers:
             f(set([cname]))
-
-    def reset_if_undefined(self, cname):
-        if cname in self.undefined_settings:
-            self.reset_setting(cname)
 
     def to_json(self):
         settings = dict(self.settings)
@@ -330,10 +310,6 @@ class BrushInfo (object):
         # settings not in json_string must still be present in self.settings
         self.load_defaults()
 
-        # settings not defined in the json
-        self.undefined_settings = BRUSH_SETTINGS.difference(
-            set(brush_def['settings'].keys())
-        )
         # MyPaint expects that each setting has an array, where
         # index 0 is base value, and index 1 is inputs
         for k, v in brush_def['settings'].items():
@@ -431,7 +407,6 @@ class BrushInfo (object):
         # but still use non-zero default
         self.settings['anti_aliasing'][0] = 0.0
         num_parsed = 0
-        settings_loaded = set()
         for rawcname, rawvalue in rawsettings:
             try:
                 cnamevaluepairs = _oldfmt_parse_value(
@@ -446,7 +421,6 @@ class BrushInfo (object):
                         if func:
                             value = _oldfmt_transform_y(value, func)
                     self.settings[cname] = value
-                    settings_loaded.add(cname)
             except Exception as e:
                 line = "%s %s" % (rawcname, rawvalue)
                 errors.append((line, str(e)))
@@ -458,7 +432,6 @@ class BrushInfo (object):
                 "old brush file format parser did not find "
                 "any brush settings in this file",
             )
-        self.undefined_settings = BRUSH_SETTINGS.difference(settings_loaded)
 
     def save_to_string(self):
         """Serialise brush information to a string. Result is cached."""
@@ -484,16 +457,12 @@ class BrushInfo (object):
         assert not math.isnan(value)
         assert not math.isinf(value)
         if self.settings[cname][0] != value:
-            if cname in self.undefined_settings:
-                self.undefined_settings.remove(cname)
             self.settings[cname][0] = value
             for f in self.observers:
                 f(set([cname]))
 
     def set_points(self, cname, input, points):
         assert cname in BRUSH_SETTINGS
-        if cname in self.undefined_settings:
-            self.undefined_settings.remove(cname)
         points = tuple(points)
         d = self.settings[cname][1]
         if points:
@@ -506,8 +475,6 @@ class BrushInfo (object):
 
     def set_setting(self, cname, value):
         self.settings[cname] = copy.deepcopy(value)
-        if cname in self.undefined_settings:
-            self.undefined_settings.remove(cname)
         for f in self.observers:
             f(set([cname]))
 
