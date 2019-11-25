@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # This file is part of MyPaint.
 # Copyright (C) 2009-2013 by Martin Renold <martinxyz@gmx.ch>
 # Copyright (C) 2013-2019 by the MyPaint Development Team.
@@ -107,7 +107,7 @@ class BrushIconEditor (Gtk.Grid):
 
     @staticmethod
     def _make_image_button(text, icon_name, cb):
-        b = Gtk.Button(text)
+        b = Gtk.Button(label=text)
         i = Gtk.Image()
         i.set_from_icon_name(icon_name, Gtk.IconSize.BUTTON)
         b.set_image(i)

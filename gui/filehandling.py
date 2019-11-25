@@ -38,7 +38,7 @@ import lib.glib
 from lib.glib import filename_to_unicode
 import lib.xml
 import lib.feedback
-from lib.pycompat import unicode
+from lib.pycompat import unicode, PY3
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +238,7 @@ class _IOProgressUI:
 
         """
         self._app = app
+        self.clock_func = time.perf_counter if PY3 else time.clock
 
         files_summary = unicode(files_summary)
         op_type = str(op_type)
@@ -310,7 +311,7 @@ class _IOProgressUI:
             statusbar.remove_all(cid)
             statusbar.push(cid, self._duration_msg)
 
-        self._start_time = time.clock()
+        self._start_time = self.clock_func()
         self._last_pulse = None
         result = None
         try:
@@ -332,7 +333,7 @@ class _IOProgressUI:
                     title=self._fail_dialog_title,
                     text=self._fail_msg,
                     secondary_text=unicode(e),
-                    type=Gtk.MessageType.ERROR,
+                    message_type=Gtk.MessageType.ERROR,
                 )
             self.success = False
         else:
@@ -350,15 +351,13 @@ class _IOProgressUI:
 
     def _progress_changed_cb(self, progress):
         if self._progress_bar is None:
-            now = time.clock()
+            now = self.clock_func()
             if (now - self._start_time) > 0.25:
-                flags = (Gtk.DialogFlags.MODAL |
-                         Gtk.DialogFlags.DESTROY_WITH_PARENT)
                 dialog = Gtk.Dialog(
                     title=self._duration_msg,
-                    parent=self._app.drawWindow,
-                    flags=flags,
-                    buttons=[],
+                    transient_for=self._app.drawWindow,
+                    modal=True,
+                    destroy_with_parent=True,
                 )
                 dialog.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
                 dialog.set_decorated(False)
@@ -391,7 +390,7 @@ class _IOProgressUI:
             return
         fraction = progress.fraction
         if fraction is None:
-            now = time.clock()
+            now = self.clock_func()
             if (now - self._last_pulse) > 0.1:
                 self._progress_bar.pulse()
                 self._last_pulse = now
@@ -597,7 +596,7 @@ class FileHandler (object):
         # Add widget for selecting save format
         box = Gtk.HBox()
         box.set_spacing(12)
-        label = Gtk.Label(C_(
+        label = Gtk.Label(label=C_(
             "save dialogs: formats and options: (label)",
             u"Format to save as:",
         ))
@@ -690,10 +689,10 @@ class FileHandler (object):
 
         # Dialog setup.
         d = Gtk.MessageDialog(
-            title = title,
-            parent = self.app.drawWindow,
-            type = Gtk.MessageType.QUESTION,
-            flags = Gtk.DialogFlags.MODAL,
+            title=title,
+            transient_for=self.app.drawWindow,
+            message_type=Gtk.MessageType.QUESTION,
+            modal=True
         )
 
         # Translated strings for things
@@ -881,7 +880,10 @@ class FileHandler (object):
             self.app.preferences["scratchpad.last_opened_scratchpad"] \
                 = self.app.scratchpad_filename
         except (FileHandlingError, AllocationError, MemoryError) as e:
-            self.app.message_dialog(unicode(e), type=Gtk.MessageType.ERROR)
+            self.app.message_dialog(
+                unicode(e),
+                message_type=Gtk.MessageType.ERROR
+            )
         else:
             self.app.scratchpad_filename = os.path.abspath(filename)
             self.app.preferences["scratchpad.last_opened_scratchpad"] \
@@ -1011,17 +1013,15 @@ class FileHandler (object):
         if not ok_to_open:
             return
         dialog = Gtk.FileChooserDialog(
-            title = C_(
+            title=C_(
                 u'File→Open: file chooser dialog: title',
                 u"Open File",
             ),
-            parent = self.app.drawWindow,
-            action = Gtk.FileChooserAction.OPEN,
-            buttons = [
-                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                Gtk.STOCK_OPEN, Gtk.ResponseType.OK,
-            ]
+            transient_for=self.app.drawWindow,
+            action=Gtk.FileChooserAction.OPEN,
         )
+        dialog.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        dialog.add_button(Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
 
         preview = Gtk.Image()
@@ -1101,11 +1101,9 @@ class FileHandler (object):
             ),
             parent = self.app.drawWindow,
             action = Gtk.FileChooserAction.OPEN,
-            buttons = [
-                Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                Gtk.STOCK_OPEN, Gtk.ResponseType.OK,
-            ]
         )
+        dialog.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        dialog.add_button(Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
 
         dialog.set_select_multiple(True)
@@ -1446,7 +1444,7 @@ class FileHandler (object):
                 'File→Open Next/Prev Scrap: error message',
                 u"There are no scrap files yet. Try saving one first.",
             )
-            self.app.message_dialog(msg, Gtk.MessageType.WARNING)
+            self.app.message_dialog(msg, message_type=Gtk.MessageType.WARNING)
             return
         next = action.get_name() == 'NextScrap'
         if next:

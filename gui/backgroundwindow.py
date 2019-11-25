@@ -49,21 +49,16 @@ class BackgroundWindow (windowing.Dialog):
         app = application.get_app()
         assert app is not None
 
-        self._current_background_pixbuf = None  # set when changed
-
-        flags = Gtk.DialogFlags.DESTROY_WITH_PARENT
-        buttons = [
-            _('Save as Default'), RESPONSE_SAVE_AS_DEFAULT,
-            Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT,
-        ]
         windowing.Dialog.__init__(
             self,
             app=app,
             title=_('Background'),
-            parent=app.drawWindow,
-            flags=flags,
-            buttons=buttons,
+            modal=True
         )
+        self.add_button(_('Save as Default'), RESPONSE_SAVE_AS_DEFAULT)
+        self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT)
+
+        self._current_background_pixbuf = None  # set when changed
 
         # Set up window.
         self.connect('response', self._response_cb)
@@ -77,10 +72,10 @@ class BackgroundWindow (windowing.Dialog):
             Gtk.PolicyType.NEVER,
             Gtk.PolicyType.AUTOMATIC,
         )
-        notebook.append_page(patterns_scroll, Gtk.Label(_('Pattern')))
+        notebook.append_page(patterns_scroll, Gtk.Label(label=_('Pattern')))
 
         self.bgl = BackgroundList(self)
-        patterns_scroll.add_with_viewport(self.bgl)
+        patterns_scroll.add(self.bgl)
 
         self.connect("realize", self._realize_cb)
         self.connect("show", self._show_cb)
@@ -88,13 +83,13 @@ class BackgroundWindow (windowing.Dialog):
 
         # Set up colors tab.
         color_vbox = Gtk.VBox()
-        notebook.append_page(color_vbox, Gtk.Label(_('Color')))
+        notebook.append_page(color_vbox, Gtk.Label(label=_('Color')))
 
         self.cs = Gtk.ColorSelection()
         self.cs.connect('color-changed', self._color_changed_cb)
         color_vbox.pack_start(self.cs, True, True, 0)
 
-        b = Gtk.Button(_('Add color to Patterns'))
+        b = Gtk.Button(label=_('Add color to Patterns'))
         b.connect('clicked', self._add_color_to_patterns_cb)
         color_vbox.pack_start(b, False, True, 0)
 
@@ -263,8 +258,8 @@ class BackgroundList (pixbuflist.PixbufList):
                 secondary_text=_("Please remove the unloadable files, or "
                                  "check your libgdkpixbuf installation."),
                 long_text=msg,
-                type=Gtk.MessageType.WARNING,
-                flags=Gtk.DialogFlags.MODAL,
+                message_type=Gtk.MessageType.WARNING,
+                modal=True,
             )
 
         logger.info("Loaded %d of %d background(s), with %d error(s)",

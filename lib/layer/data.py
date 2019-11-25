@@ -35,6 +35,7 @@ import lib.helpers as helpers
 import lib.fileutils
 import lib.pixbuf
 import lib.modes
+import lib.mypaintlib
 from . import core
 import lib.layer.error
 import lib.autosave
@@ -1011,11 +1012,14 @@ class BackgroundLayer (SurfaceBackedLayer):
     # the layers stack, extending the FileBackedLayer concept.  Think
     # textures!
 
-    # The un-namespaced legacy attribute name is deprecated since
-    # MyPaint v1.2.0, and background layers in OpenRaster files will not
-    # be saved with it beginning with v1.3.0 at the *very* earliest.
-    # MyPaint will support reading .ora files using the legacy
-    # background tile attribute until v2.0.0.
+    # The legacy non-namespaced attribute is no longer _written_
+    # to files as of the 2.0 release. 2.0 .ora files will not
+    # be stable in 1.2.1 and earlier in the general case, so
+    # there is no point in pretending that they are.
+
+    # MyPaint will support _reading_ .ora files using the legacy
+    # background tile attribute through the 2.x releases, but
+    # no distinction is made when such files are subseqently saved.
 
     ORA_BGTILE_LEGACY_ATTR = "background_tile"
     ORA_BGTILE_ATTR = "{%s}background-tile" % (
@@ -1031,6 +1035,7 @@ class BackgroundLayer (SurfaceBackedLayer):
                                               surface=surface, **kwargs)
         self.locked = False
         self.visible = True
+        self.mode = lib.mypaintlib.CombineNormal
         self.opacity = 1.0
 
     def set_surface(self, surface):
@@ -1077,7 +1082,6 @@ class BackgroundLayer (SurfaceBackedLayer):
         logger.debug('%.3fs surface saving %s', t1 - t0, storename)
         orazip.write(tmppath, storename)
         os.remove(tmppath)
-        elem.attrib[self.ORA_BGTILE_LEGACY_ATTR] = storename
         elem.attrib[self.ORA_BGTILE_ATTR] = storename
 
         progress.close()
