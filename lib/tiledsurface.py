@@ -22,8 +22,8 @@ from gettext import gettext as _
 import numpy as np
 
 from . import mypaintlib
-from . import helpers
 from . import pixbufsurface
+from lib.eotf import eotf
 import lib.surface
 from lib.surface import TileAccessible
 from lib.surface import TileBlittable
@@ -132,12 +132,6 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
         self.get_color = self._backend.get_color
         self.get_alpha = self._backend.get_alpha
         self.draw_dab = self._backend.draw_dab
-        from gui.application import get_app
-        self.app = get_app()
-        try:
-            self.EOTF = self.app.preferences['display.colorspace_EOTF']
-        except: 
-            self.EOTF = 2.2
 
     @classmethod
     def _mock(cls):
@@ -394,9 +388,13 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
                     mypaintlib.tile_copy_rgba16_into_rgba16(src, dst)
                 else:
                     if dst_has_alpha:
-                        mypaintlib.tile_convert_rgba16_to_rgba8(src, dst, self.EOTF)
+                        mypaintlib.tile_convert_rgba16_to_rgba8(
+                            src, dst, eotf()
+                        )
                     else:
-                        mypaintlib.tile_convert_rgbu16_to_rgbu8(src, dst, self.EOTF)
+                        mypaintlib.tile_convert_rgbu16_to_rgbu8(
+                            src, dst, eotf()
+                        )
 
     def composite_tile(self, dst, dst_has_alpha, tx, ty, mipmap_level=0,
                        opacity=1.0, mode=mypaintlib.CombineNormal,
@@ -600,7 +598,9 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
                 src = state['buf'][:, i*N:(i+1)*N, :]
                 if src[:, :, 3].any():
                     with self.tile_request(tx, ty, readonly=False) as dst:
-                        mypaintlib.tile_convert_rgba8_to_rgba16(src, dst, self.EOTF)
+                        mypaintlib.tile_convert_rgba8_to_rgba16(
+                            src, dst, eotf()
+                        )
             if state["progress"]:
                 try:
                     state["progress"].completed(ty - ty0)
@@ -732,7 +732,7 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
         return flood_fill(self, fill_args, dst)
 
     @contextlib.contextmanager
-    def cairo_request(self, x, y, w, h, mode=lib.modes.DEFAULT_MODE):
+    def cairo_request(self, x, y, w, h, mode=lib.modes.default_mode):
         """Get a Cairo context for a given area, then put back changes.
 
         :param int x: Request area's X coordinate.
@@ -792,6 +792,9 @@ class MyPaintSurface (TileAccessible, TileBlittable, TileCompositable):
         """
 
         # Normalize and validate args
+        if callable(mode):
+            mode = mode()
+
         if mode is not None:
             if mode == lib.modes.PASS_THROUGH_MODE:
                 mode = None
