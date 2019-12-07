@@ -7,7 +7,19 @@
  * (at your option) any later version.
  */
 
+
+#include "surface.hpp"
+
 #include <mypaint-tiled-surface.h>
+#include <Python.h>
+
+#include <cstdio>
+#include <vector>
+
+// Implementation of tiled surface backend
+#include "pythontiledsurface.cpp"
+
+#define BBOXES 50
 
 enum SymmetryType
 {
@@ -22,10 +34,6 @@ enum SymmetryType
 static const int TILE_SIZE = MYPAINT_TILE_SIZE;
 static const int MAX_MIPMAP_LEVEL = MYPAINT_MAX_MIPMAP_LEVEL;
 
-// Implementation of tiled surface backend
-#include "pythontiledsurface.cpp"
-
-#include <vector>
 
 // Interface class, wrapping the backend the way MyPaint wants to use it
 class TiledSurface : public Surface {
@@ -52,13 +60,21 @@ public:
   void begin_atomic() {
       mypaint_surface_begin_atomic((MyPaintSurface *)c_surface);
   }
-  std::vector<int> end_atomic() {
-      MyPaintRectangle bbox_rect;
-      mypaint_surface_end_atomic((MyPaintSurface *)c_surface, &bbox_rect);
-      std::vector<int> bbox = std::vector<int>(4, 0);
-      bbox[0] = bbox_rect.x;     bbox[1] = bbox_rect.y;
-      bbox[2] = bbox_rect.width; bbox[3] = bbox_rect.height;
-      return bbox;
+  std::vector<std::vector<int>> end_atomic() {
+      MyPaintRectangle* rects = this->bbox_rectangles;
+      MyPaintRectangles bboxes = {BBOXES, rects};
+
+      mypaint_surface_end_atomic((MyPaintSurface *)c_surface, &bboxes);
+
+      // The capacity of the bounding box array will most often exceed the number
+      // of rectangles that are actually used. The call to mypaint_surface_end_atomic
+      // sets the num_rectangles field to N to indicate that the first N rectangles
+      // were modified during the call.
+      std::vector<std::vector<int>> out_bboxes = std::vector<std::vector<int>>(bboxes.num_rectangles);
+      for(int i = 0; i < bboxes.num_rectangles; ++i) {
+        out_bboxes[i] = {rects[i].x, rects[i].y, rects[i].width, rects[i].height};
+      }
+      return out_bboxes;
   }
 
   // returns true if the surface was modified
@@ -100,6 +116,7 @@ public:
   }
 
 private:
+    MyPaintRectangle bbox_rectangles[BBOXES];
     MyPaintPythonTiledSurface *c_surface;
     MyPaintTileRequest tile_request;
     bool tile_request_in_progress;
@@ -142,7 +159,7 @@ extern "C" {
 MyPaintSurface *
 mypaint_python_surface_factory(gpointer user_data)
 {
-    PyObject *module = get_module("lib.tiledsurface");
+    PyObject *module = get_module((char*)"lib.tiledsurface");
     PyObject *instance = new_py_tiled_surface(module);
     assert(instance != NULL);
     // Py_DECREF(module);

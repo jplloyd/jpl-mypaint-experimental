@@ -1,5 +1,5 @@
 # This file is part of MyPaint.
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # Copyright (C) 2010-2018 by the MyPaint Development Team.
 # Copyright (C) 2009-2013 by Martin Renold <martinxyz@gmx.ch>
 #
@@ -71,7 +71,7 @@ def ask_for_name(widget, title, default):
     hbox.set_border_width(widgets.SPACING)
 
     d.vbox.pack_start(hbox, True, True, 0)
-    hbox.pack_start(Gtk.Label(_('Name')), False, False, 0)
+    hbox.pack_start(Gtk.Label(label=_('Name')), False, False, 0)
 
     if default is None:
         default = ""
@@ -131,15 +131,15 @@ def confirm_rewrite_brush(window, brushname, existing_preview_pixbuf,
     img_yes.set_from_stock(Gtk.STOCK_YES, Gtk.IconSize.BUTTON)
     img_no = Gtk.Image()
     img_no.set_from_stock(Gtk.STOCK_NO, Gtk.IconSize.BUTTON)
-    overwrite_this = Gtk.Button(_("Replace"))
+    overwrite_this = Gtk.Button(label=_("Replace"))
     overwrite_this.set_image(img_yes)
     overwrite_this.show_all()
-    skip_this = Gtk.Button(_("Rename"))
+    skip_this = Gtk.Button(label=_("Rename"))
     skip_this.set_image(img_no)
     skip_this.show_all()
-    overwrite_all = Gtk.Button(_("Replace all"))
+    overwrite_all = Gtk.Button(label=_("Replace all"))
     overwrite_all.show_all()
-    skip_all = Gtk.Button(_("Rename all"))
+    skip_all = Gtk.Button(label=_("Rename all"))
     skip_all.show_all()
 
     buttons = [
@@ -162,7 +162,7 @@ def confirm_rewrite_brush(window, brushname, existing_preview_pixbuf,
     label_l = Gtk.Label(label=_("Imported brush"))
     label_r = Gtk.Label(label=_("Existing brush"))
 
-    question = Gtk.Label(_(
+    question = Gtk.Label(label=_(
         u"<b>A brush named “{brush_name}” already exists.</b>\n"
         u"Do you want to replace it, "
         u"or should the new brush be renamed?"
@@ -201,10 +201,10 @@ def confirm_rewrite_group(window, groupname, deleted_groupname):
     img_yes.set_from_stock(Gtk.STOCK_YES, Gtk.IconSize.BUTTON)
     img_no = Gtk.Image()
     img_no.set_from_stock(Gtk.STOCK_NO, Gtk.IconSize.BUTTON)
-    overwrite_this = Gtk.Button(_("Replace"))
+    overwrite_this = Gtk.Button(label=_("Replace"))
     overwrite_this.set_image(img_yes)
     overwrite_this.show_all()
-    skip_this = Gtk.Button(_("Rename"))
+    skip_this = Gtk.Button(label=_("Rename"))
     skip_this.set_image(img_no)
     skip_this.show_all()
 
@@ -216,7 +216,7 @@ def confirm_rewrite_group(window, groupname, deleted_groupname):
     for button, code in buttons:
         dialog.add_action_widget(button, code)
 
-    question = Gtk.Label(_(
+    question = Gtk.Label(label=_(
         u"<b>A group named “{groupname}” already exists.</b>\n"
         u"Do you want to replace it, or should the new group be renamed?\n"
         u"If you replace it, the brushes may be moved to a group called"

@@ -117,7 +117,7 @@ class BrushEditorWindow (SubWindow):
             for s in brushsettings.settings_visible:
                 adj = Gtk.Adjustment(value=s.default,
                                      lower=s.min, upper=s.max,
-                                     step_incr=0.01, page_incr=0.1)
+                                     step_increment=0.01, page_increment=0.1)
                 self._base_adj[s.cname] = adj
             changed_cb = self._testmode_base_value_adj_changed_cb
             for cname, adj in self._base_adj.iteritems():
@@ -126,23 +126,26 @@ class BrushEditorWindow (SubWindow):
         for inp in brushsettings.inputs:
             name = inp.name
             adj = Gtk.Adjustment(value=1.0 / 4.0, lower=-1.0, upper=1.0,
-                                 step_incr=0.01, page_incr=0.1)
+                                 step_increment=0.01, page_increment=0.1)
             adj.connect("value-changed", self.input_adj_changed_cb, inp)
             self._input_y_adj[name] = adj
             lower = -20.0
             upper = +20.0
-            if inp.hard_min is not None:
+            # Pre-libmypaint split, the limits were read from json and could be
+            # None. Now that cannot be checked directly, so instead check if
+            # the limits are extreme (in libmypaint, they are set to +-FLT_MAX)
+            if abs(inp.hard_min) < 1e16:
                 lower = inp.hard_min
-            if inp.hard_max is not None:
+            if abs(inp.hard_max) < 1e16:
                 upper = inp.hard_max
             adj = Gtk.Adjustment(value=inp.soft_min,
                                  lower=lower, upper=upper - 0.1,
-                                 step_incr=0.01, page_incr=0.1)
+                                 step_increment=0.01, page_increment=0.1)
             adj.connect("value-changed", self.input_adj_changed_cb, inp)
             self._input_xmin_adj[name] = adj
             adj = Gtk.Adjustment(value=inp.soft_max,
                                  lower=lower + 0.1, upper=upper,
-                                 step_incr=0.01, page_incr=0.1)
+                                 step_increment=0.01, page_increment=0.1)
             adj.connect("value-changed", self.input_adj_changed_cb, inp)
             self._input_xmax_adj[name] = adj
 

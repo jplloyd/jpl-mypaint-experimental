@@ -31,6 +31,7 @@ from lib.naming import make_unique_name
 from gi.repository import GObject
 from gi.repository import GLib
 
+import lib.meta
 import lib.helpers as helpers
 import lib.fileutils as fileutils
 import lib.tiledsurface as tiledsurface
@@ -40,6 +41,7 @@ import lib.brush as brush
 from lib.observable import event
 from lib.observable import ObservableDict
 import lib.pixbuf
+from lib.cache import DEFAULT_CACHE_SIZE
 from lib.errors import FileHandlingError
 from lib.errors import AllocationError
 import lib.idletask
@@ -77,6 +79,9 @@ _ERROR_SEE_LOGS_LINE = C_(
 )
 
 # OpenRaster dialect consts
+
+_ORA_MYPAINT_VERSION \
+    = "{%s}version" % (lib.xml.OPENRASTER_MYPAINT_NS,)
 
 _ORA_FRAME_ACTIVE_ATTR \
     = "{%s}frame-active" % (lib.xml.OPENRASTER_MYPAINT_NS,)
@@ -265,12 +270,14 @@ class Document (object):
 
     ## Initialization and cleanup
 
-    def __init__(self, brushinfo=None, painting_only=False, cache_dir=None):
+    def __init__(self, brushinfo=None, painting_only=False,
+                 cache_dir=None, cache_size=DEFAULT_CACHE_SIZE):
         """Initialize
 
         :param brushinfo: the lib.brush.BrushInfo instance to use
         :param painting_only: only use painting layers
         :param cache_dir: use an existing cache dir
+        :param cache_size: size of the layer render cache
 
         If painting_only is true, then no tempdir will be created by the
         document when it is initialized or cleared.
@@ -285,7 +292,7 @@ class Document (object):
         if not brushinfo:
             brushinfo = brush.BrushInfo()
             brushinfo.load_defaults()
-        self._layers = layer.RootLayerStack(self)
+        self._layers = layer.RootLayerStack(self, cache_size=cache_size)
         self._layers.layer_content_changed += self._canvas_modified_cb
         self.brush = brush.Brush(brushinfo)
         self.brush.brushinfo.observers.append(self.brushsettings_changed_cb)
@@ -640,6 +647,8 @@ class Document (object):
             )
             image_elem.attrib[_ORA_JSON_SETTINGS_ATTR] = settings_file_rel
             manifest.add(settings_file_rel)
+        # Store version of MyPaint the file was saved with
+        image_elem.attrib[_ORA_MYPAINT_VERSION] = lib.meta.MYPAINT_VERSION
         # Thumbnail generation.
         rootstack_sshot = self.layer_stack.save_snapshot()
         rootstack_clone = layer.RootLayerStack(doc=None)
@@ -2059,6 +2068,9 @@ def _save_layers_to_new_orazip(root_stack, filename, bbox=None,
         zip_path = _ORA_JSON_SETTINGS_ZIP_PATH
         helpers.zipfile_writestr(orazip, zip_path, json_data)
         image.attrib[_ORA_JSON_SETTINGS_ATTR] = zip_path
+
+    # MyPaint version
+    image.attrib[_ORA_MYPAINT_VERSION] = lib.meta.MYPAINT_VERSION
 
     # Resolution info
     if xres and yres:

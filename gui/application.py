@@ -45,6 +45,7 @@ from gi.repository import GLib
 from gettext import gettext as _
 
 import lib.observable
+import lib.cache
 import lib.document
 from lib import brush
 from lib import helpers
@@ -321,7 +322,10 @@ class Application (object):
         app_canvas = self.builder.get_object("app_canvas")
 
         # Working document: model and controller
-        model = lib.document.Document(self.brush)
+        cache_size = self.preferences.get(
+            'ui.rendered_tile_cache_size', lib.cache.DEFAULT_CACHE_SIZE
+        )
+        model = lib.document.Document(self.brush, cache_size=cache_size)
         self.doc = document.Document(self, app_canvas, model)
         app_canvas.set_model(model)
 
@@ -329,8 +333,10 @@ class Application (object):
         signal_callback_objs.append(self.doc.modes)
 
         self.scratchpad_filename = ""
-        scratchpad_model = lib.document.Document(self.brush,
-                                                 painting_only=True)
+        scratchpad_model = lib.document.Document(
+            self.brush, painting_only=True,
+            cache_size=lib.cache.DEFAULT_CACHE_SIZE/4
+        )
         scratchpad_tdw = tileddrawwidget.TiledDrawWidget()
         scratchpad_tdw.scroll_on_allocate = False
         scratchpad_tdw.set_model(scratchpad_model)
@@ -518,7 +524,7 @@ class Application (object):
         changed_cb = self._brush_adjustment_value_changed_cb
         for s in brushsettings.settings_visible:
             adj = Gtk.Adjustment(value=s.default, lower=s.min, upper=s.max,
-                                 step_incr=0.01, page_incr=0.1)
+                                 step_increment=0.01, page_increment=0.1)
             self.brush_adjustment[s.cname] = adj
             adj.connect("value-changed", changed_cb, s.cname)
         self.brush.observers.append(self._brush_modified_cb)
@@ -577,15 +583,14 @@ class Application (object):
         self.preferences["workspace.layout"] = wkspace.get_layout()
         self.save_settings()
 
-    def message_dialog(self, text, type=Gtk.MessageType.INFO, flags=0,
+    def message_dialog(self, text,
                        secondary_text=None, long_text=None, title=None,
-                       investigate_dir=None, investigate_str=None):
+                       investigate_dir=None, investigate_str=None, **kwds):
         """Utility function to show a message/information dialog"""
         d = Gtk.MessageDialog(
-            parent=self.drawWindow,
-            flags=flags,
-            type=type,
-            buttons=[],
+            transient_for=self.drawWindow,
+            buttons=Gtk.ButtonsType.NONE,
+            **kwds
         )
         # Auxiliary actions first...
         if investigate_dir and os.path.isdir(investigate_dir):
