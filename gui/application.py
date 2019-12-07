@@ -51,6 +51,7 @@ from lib import brush
 from lib import helpers
 from lib import mypaintlib
 from lib import brushsettings
+import gui.compatibility as compat
 import gui.device
 from . import filehandling
 from . import keyboard
@@ -275,6 +276,11 @@ class Application (object):
         self._preferences = lib.observable.ObservableDict()
         self.load_settings()
 
+        # Set up compatibility mode (most of it)
+        self.compat_mode = None
+        self.reset_compat_mode(update=False)
+        compat.update_default_layer_type(self)
+
         # Unmanaged main brush.
         # Always the same instance (we can attach settings_observers).
         # This brush is where temporary changes (color, size...) happen.
@@ -342,11 +348,13 @@ class Application (object):
         scratchpad_tdw.set_model(scratchpad_model)
         self.scratchpad_doc = document.Document(self, scratchpad_tdw,
                                                 scratchpad_model)
+
         self.brushmanager = brushmanager.BrushManager(
             lib.config.mypaint_brushdir,
             join(self.state_dirs.user_data, 'brushes'),
             self,
         )
+
         signal_callback_objs.append(self.filehandler)
         self.brushmodifier = brushmodifier.BrushModifier(self)
         signal_callback_objs.append(self.brushmodifier)
@@ -431,6 +439,10 @@ class Application (object):
         col = self.brush_color_manager.get_color()
         self.brushmanager.select_initial_brush()
         self.brush_color_manager.set_color(col)
+
+        # Complete the compatibility mode setup
+        compat.update_default_pigment_setting(self)
+
         if filenames:
             # Open only the first file, no matter how many has been specified
             # If the file does not exist just set it as the file to save to
@@ -506,6 +518,11 @@ class Application (object):
             # old config file; users who never assigned any buttons would
             # end up with Ctrl-Click color picker broken after upgrade
             self.preferences[key] = default_config[key]
+
+    def reset_compat_mode(self, update=True):
+        """Reset compatibility mode to configured default"""
+        compat.set_compat_mode(
+            self, self.preferences[compat.DEFAULT_COMPAT], update=update)
 
     def add_action_group(self, ag):
         self.ui_manager.insert_action_group(ag, -1)

@@ -30,6 +30,7 @@ from lib import helpers
 from lib import fileutils
 from lib.errors import FileHandlingError
 from lib.errors import AllocationError
+import gui.compatibility as compat
 from gui.widgets import with_wait_cursor
 from lib import mypaintlib
 from lib.gettext import ngettext
@@ -337,11 +338,15 @@ class _IOProgressUI:
                 )
             self.success = False
         else:
-            logger.info("IO succeeded: %s", self._success_msg)
+            if result is False:
+                logger.info("IO operation was cancelled by the user")
+            else:
+                logger.info("IO succeeded: %s", self._success_msg)
             if self._use_statusbar:
                 statusbar.remove_all(cid)
-                self._app.show_transient_message(self._success_msg)
-            self.success = True
+                if result is not False:
+                    self._app.show_transient_message(self._success_msg)
+            self.success = result is not False
         finally:
             if self._progress_bar is not None:
                 self._progress_dialog.destroy()
@@ -805,6 +810,7 @@ class FileHandler (object):
         )
         if not ok_to_start_new_doc:
             return
+        self.app.reset_compat_mode()
         self.doc.reset_background()
         self.doc.model.clear()
         self.filename = None
@@ -816,15 +822,16 @@ class FileHandler (object):
         while Gtk.events_pending():
             Gtk.main_iteration()
 
-    def open_file(self, filename):
+    def open_file(self, filename, **kwargs):
         """Load a file, replacing the current working document."""
         if not self._call_doc_load_method(
-                self.doc.model.load, filename, False):
+                self.doc.model.load, filename, False, **kwargs):
             # Without knowledge of _when_ the process failed, clear
             # the document to make sure we're not in an inconsistent state.
             # TODO: Improve the control flow to permit a less draconian
             # approach, for exceptions occurring prior to any doc-changes.
             self.filename = None
+            self.app.reset_compat_mode()
             self.doc.model.clear()
             return
 
@@ -853,7 +860,8 @@ class FileHandler (object):
             return
         logger.info('Imported layers from %r', filenames)
 
-    def _call_doc_load_method(self, method, arg, is_import):
+    def _call_doc_load_method(
+            self, method, arg, is_import, compat_handler=None):
         """Internal: common GUI aspects of loading or importing files.
 
         Calls a document model loader method (on lib.document.Document)
@@ -861,6 +869,8 @@ class FileHandler (object):
         shows appropriate error messages.
 
         """
+        if not compat_handler:
+            compat_handler = compat.ora_compat_handler(self.app)
         prefs = self.app.preferences
         display_colorspace_setting = prefs["display.colorspace"]
 
@@ -868,11 +878,13 @@ class FileHandler (object):
 
         files_summary = _IOProgressUI.format_files_summary(arg)
         ioui = _IOProgressUI(self.app, op_type, files_summary)
-        ioui.call(
+        result = ioui.call(
             method, arg,
             convert_to_srgb=(display_colorspace_setting == "srgb"),
+            compat_handler=compat_handler,
+            incompatible_ora_cb=compat.incompatible_ora_cb(self.app)
         )
-        return ioui.success
+        return (result is not False) and ioui.success
 
     def open_scratchpad(self, filename):
         no_ui_progress = lib.feedback.Progress()
@@ -1030,6 +1042,11 @@ class FileHandler (object):
         dialog.add_button(Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
 
+        # Compatibility override options for .ora files
+        selector = compat.CompatSelector(self.app)
+        dialog.connect('selection-changed', selector.file_selection_changed_cb)
+        dialog.set_extra_widget(selector.widget)
+
         preview = Gtk.Image()
         dialog.set_preview_widget(preview)
         dialog.connect("update-preview", self.update_preview_cb, preview)
@@ -1053,7 +1070,10 @@ class FileHandler (object):
                 dialog.hide()
                 filename = dialog.get_filename()
                 filename = filename_to_unicode(filename)
-                self.open_file(filename)
+                self.open_file(
+                    filename,
+                    compat_handler=selector.compat_function
+                )
         finally:
             dialog.destroy()
 

@@ -27,6 +27,7 @@ from gui.blendmodehandler import BlendModes
 import gui.layers
 import gui.overlays
 
+import lib.eotf
 import lib.floodfill
 import lib.helpers
 import lib.mypaintlib
@@ -205,10 +206,6 @@ class FloodFillMode (
         If the current layer is not fillable, a new layer will always be
         created for the fill.
         """
-        try:
-            self.EOTF = self.app.preferences['display.colorspace_EOTF']
-        except: 
-            self.EOTF = 2.2
         self._tdws.add(tdw)
         self._update_ui()
         color = self.doc.app.brush_color_manager.get_color()
@@ -217,8 +214,10 @@ class FloodFillMode (
         rootstack = tdw.doc.layer_stack
         if not rootstack.current.get_fillable():
             make_new_layer = True
+        eotf = lib.eotf.eotf()
         rgb = color.get_rgb()
-        rgb = (rgb[0]**self.EOTF, rgb[1]**self.EOTF, rgb[2]**self.EOTF)
+        if eotf != 1.0:
+            rgb = (rgb[0]**eotf, rgb[1]**eotf, rgb[2]**eotf)
         view_bbox = None
         if opts.limit_to_view:
             corners = tdw.get_corners_model_coords()
@@ -682,8 +681,8 @@ class FloodFillOptionsWidget (Gtk.Grid):
         self._bm_warning_label = (label, 0, row, 1, 1)
 
         modes = list(lib.modes.STANDARD_MODES)
-        modes.remove(lib.modes.DEFAULT_MODE)
-        modes.insert(0, lib.modes.DEFAULT_MODE)
+        modes.remove(lib.mypaintlib.CombineSpectralWGM)
+        modes.insert(0, lib.mypaintlib.CombineSpectralWGM)
         combo = gui.layers.new_blend_mode_combo(modes, lib.modes.MODE_STRINGS)
         combo.set_tooltip_text(C_(
             "fill options: Target | Blend Mode dropdown (tooltip)",

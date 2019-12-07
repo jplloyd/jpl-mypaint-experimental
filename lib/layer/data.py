@@ -27,6 +27,7 @@ import uuid
 import struct
 import contextlib
 
+from lib.brush import BrushInfo
 from lib.gettext import C_
 from lib.tiledsurface import N
 import lib.tiledsurface as tiledsurface
@@ -350,7 +351,7 @@ class SurfaceBackedLayer (core.LayerBase, lib.autosave.Autosaveable):
             if self not in spec.layers:
                 return []
 
-        mode_default = lib.modes.DEFAULT_MODE
+        mode_default = lib.modes.default_mode()
         if spec.previewing:
             mode = mode_default
             opacity = 1.0
@@ -1385,7 +1386,7 @@ class SimplePaintingLayer (SurfaceBackedLayer):
         return split
 
     @contextlib.contextmanager
-    def cairo_request(self, x, y, w, h, mode=lib.modes.DEFAULT_MODE):
+    def cairo_request(self, x, y, w, h, mode=lib.modes.default_mode):
         """Get a Cairo context for a given area, then put back changes.
 
         See lib.tiledsurface.MyPaintSurface.cairo_request() for details.
@@ -1423,12 +1424,13 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
 
     # The un-namespaced legacy attribute name is deprecated since
     # MyPaint v1.2.0, and painting layers in OpenRaster files will not
-    # be saved with it beginning with v1.3.0 at the earliest.
+    # be saved with it beginning with v2.0.0.
     # MyPaint will support reading .ora files using the legacy strokemap
     # attribute (and the "v2" strokemap format, if the format changes)
-    # until v2.0.0.
+    # throughout v2.x.
 
     _ORA_STROKEMAP_ATTR = "{%s}strokemap" % (lib.xml.OPENRASTER_MYPAINT_NS,)
+    _ORA_STROKEMAP_LEGACY_ATTR = "mypaint_strokemap_v2"
 
     ## Initializing & resetting
 
@@ -1450,7 +1452,7 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
         self.strokes = []
 
     def load_from_openraster(self, orazip, elem, cache_dir, progress,
-                             x=0, y=0, **kwargs):
+                             x=0, y=0, invert_strokemaps=False, **kwargs):
         """Loads layer flags, PNG data, and strokemap from a .ora zipfile"""
         # Load layer tile data and flags
         super(StrokemappedPaintingLayer, self).load_from_openraster(
@@ -1461,7 +1463,9 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
             x=x, y=y,
             **kwargs
         )
-        self._load_strokemap_from_ora(elem, x, y, orazip=orazip)
+        self._load_strokemap_from_ora(
+            elem, x, y, invert_strokemaps, orazip=orazip
+        )
 
     def load_from_openraster_dir(self, oradir, elem, cache_dir, progress,
                                  x=0, y=0, **kwargs):
@@ -1475,15 +1479,18 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
             x=x, y=y,
             **kwargs
         )
-        self._load_strokemap_from_ora(elem, x, y, oradir=oradir)
+        self._load_strokemap_from_ora(elem, x, y, False, oradir=oradir)
 
-    def _load_strokemap_from_ora(self, elem, x, y, orazip=None, oradir=None):
+    def _load_strokemap_from_ora(
+            self, elem, x, y, invert=False, orazip=None, oradir=None
+    ):
         """Load the strokemap from a layer elem & an ora{zip|dir}."""
         attrs = elem.attrib
         x += int(attrs.get('x', 0))
         y += int(attrs.get('y', 0))
         supported_strokemap_attrs = [
             self._ORA_STROKEMAP_ATTR,
+            self._ORA_STROKEMAP_LEGACY_ATTR,
         ]
         strokemap_name = None
         for attr_qname in supported_strokemap_attrs:
@@ -1498,17 +1505,22 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
             break
         if strokemap_name is None:
             return
+        # This is a hacky way of identifying files which need their stroke
+        # maps inverted, due to storing visually inconsistent colors.
+        # These files are distinguished by lacking both the legacy strokemap
+        # attribute and the eotf attribute. This support will be temporary.
+        invert = invert and not attrs.get(self._ORA_STROKEMAP_LEGACY_ATTR)
         if orazip:
             if PY3:
                 ioclass = BytesIO
             else:
                 ioclass = StringIO
             sio = ioclass(orazip.read(strokemap_name))
-            self._load_strokemap_from_file(sio, x, y)
+            self._load_strokemap_from_file(sio, x, y, invert)
             sio.close()
         elif oradir:
             with open(os.path.join(oradir, strokemap_name), "rb") as sfp:
-                self._load_strokemap_from_file(sfp, x, y)
+                self._load_strokemap_from_file(sfp, x, y, invert)
         else:
             raise ValueError("either orazip or oradir must be specified")
 
@@ -1574,7 +1586,7 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
 
     ## Strokemap load and save
 
-    def _load_strokemap_from_file(self, f, translate_x, translate_y):
+    def _load_strokemap_from_file(self, f, translate_x, translate_y, invert):
         assert not self.strokes
         brushes = []
         x = int(translate_x // N) * N
@@ -1586,7 +1598,10 @@ class StrokemappedPaintingLayer (SimplePaintingLayer):
             if t == b"b":
                 length, = struct.unpack('>I', f.read(4))
                 tmp = f.read(length)
-                brushes.append(zlib.decompress(tmp))
+                b_string = zlib.decompress(tmp)
+                if invert:
+                    b_string = BrushInfo.brush_string_inverted_eotf(b_string)
+                brushes.append(b_string)
             elif t == b"s":
                 brush_id, length = struct.unpack('>II', f.read(2 * 4))
                 stroke = lib.strokemap.StrokeShape()
