@@ -110,6 +110,8 @@ class AccelMapEditor (Gtk.Grid):
         cell.set_property("xpad", 8)
         cell.connect("edited", self._accel_edited_cb)
         cell.connect("editing-started", self._accel_editing_started_cb)
+        # TRANSLATORS: Refers to a keyboard key combination, such as "Ctrl+G".
+        # TRANSLATORS: Second column label in the keybinding preferences tab.
         col = Gtk.TreeViewColumn(_("Key combination"), cell)
         col.add_attribute(cell, "markup", self._ACCEL_LABEL_COLUMN)
         col.set_expand(False)
@@ -141,7 +143,6 @@ class AccelMapEditor (Gtk.Grid):
         for group in self.ui_manager.get_action_groups():
             group_name = group.get_name()
             for action in group.list_actions():
-
                 action_name = _udecode(action.get_name())
                 path = u"<Actions>/%s/%s" % (group_name, action_name)
                 if isinstance(action, Gtk.RecentAction):
@@ -153,6 +154,19 @@ class AccelMapEditor (Gtk.Grid):
 
                 action_label = _udecode(action.get_label())
                 if not action_label:
+                    # TODO: Find better place for the label/tooltip copying,
+                    # or a better way to do this in general.
+                    action_suffix = "Centered"
+                    if action_name.endswith(action_suffix):
+                        src_name = action_name[:-len(action_suffix)]
+                        logger.debug(
+                            "Excluding toolbar-specific action: %s, but copy "
+                            "tooltip/label from %s."
+                            % (action_name, src_name)
+                        )
+                        src_action = group.get_action(src_name)
+                        action.set_tooltip(src_action.get_tooltip())
+                        action.set_label(src_action.get_label())
                     continue
 
                 action_desc = _udecode(action.get_tooltip())
@@ -291,6 +305,9 @@ class AccelMapEditor (Gtk.Grid):
 
         editable.set_sensitive(False)
         dialog = Gtk.Dialog()
+        # TRANSLATORS: Window title for the keybinding dialog. The %s is
+        # TRANSLATORS: replaced with the name of the action that the key
+        # TRANSLATORS: combination is being bound to, e.g. "Fit to View".
         dialog.set_title(_("Edit Key for '%s'") % action_label)
         dialog.set_transient_for(self.get_toplevel())
         dialog.set_position(Gtk.WindowPosition.CENTER_ON_PARENT)
@@ -335,6 +352,11 @@ class AccelMapEditor (Gtk.Grid):
             row += 1
             label = Gtk.Label()
             label.set_alignment(0, 0.5)
+            # TRANSLATORS: Path refers to an "action path" that is part of an
+            # TRANSLATORS: accelerator (keybinding). Found in the dialog for
+            # TRANSLATORS: adding new keybindings. This is a technical field
+            # TRANSLATORS: that probably shouldn't even be part of the gui,
+            # TRANSLATORS: so don't worry too much about the translation.
             label.set_text(_("Path:"))
             grid.attach(label, 0, row, 1, 1)
             label = Gtk.Label()
@@ -346,6 +368,8 @@ class AccelMapEditor (Gtk.Grid):
         row += 1
         label = Gtk.Label()
         label.set_alignment(0, 0.5)
+        # TRANSLATORS: Key refers to a key on the keyboard, this is a label
+        # TRANSLATORS: in the dialog for adding new keyboard bindings.
         label.set_text(_("Key:"))
         grid.attach(label, 0, row, 1, 1)
         label = Gtk.Label()
@@ -384,6 +408,10 @@ class AccelMapEditor (Gtk.Grid):
 
     def _edit_dialog_set_standard_hint(self, dialog):
         """Set the boring how-to message in capture dialog"""
+        # TRANSLATORS: "keys" refers to keyboard keys, assignment refers
+        # TRANSLATORS: to an assignment of a keyboard key combination to
+        # TRANSLATORS: an action. This is an instructive message in the
+        # TRANSLATORS: keybinding dialog (Preferences | Keys).
         markup = _("Press keys to update this assignment")
         self._edit_dialog_set_hint(dialog, markup)
 
@@ -439,6 +467,8 @@ class AccelMapEditor (Gtk.Grid):
                 clash_accel_path = path
                 clash_action_label = _udecode(self._action_labels.get(
                     clash_accel_path,
+                    # TRANSLATORS: Part of the keybinding dialog, refers
+                    # TRANSLATORS: to an action bound to a key combination.
                     _(u"Unknown Action"),
                 ))
                 break
@@ -448,6 +478,8 @@ class AccelMapEditor (Gtk.Grid):
             dialog.accel_label_widget.set_text(label)
         elif clash_accel_path:
             markup_tmpl = _(
+                # TRANSLATORS: Warning message when attempting to assign a
+                # TRANSLATORS: keyboard combination that is already used.
                 u"<b>{accel} is already in use for '{action}'. "
                 u"The existing assignment will be replaced.</b>"
             )
