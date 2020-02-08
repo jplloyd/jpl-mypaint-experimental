@@ -815,7 +815,7 @@ def get_ext_modules():
     # order of the pkg-config output, but this ensures it.
     mypaintlib_opts = pkgconfig(
         packages=[
-            "libmypaint-2.0",
+            "libmypaint >= 1.5"
         ],
         include_dirs=[
             numpy.get_include(),

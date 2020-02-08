@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: mypaint v2.0.0-alpha.12-327-ga332f03\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2019-12-20 19:50+0100\n"
-"PO-Revision-Date: 2019-12-23 09:02+0000\n"
+"PO-Revision-Date: 2020-02-06 19:50+0000\n"
 "Last-Translator: geun-tak Jeong <beroberos@gmail.com>\n"
 "Language-Team: Korean <https://hosted.weblate.org/projects/mypaint/mypaint/"
 "ko/>\n"
@@ -14,7 +14,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Generator: Weblate 3.10\n"
+"X-Generator: Weblate 3.11-dev\n"
 "X-Poedit-SourceCharset: utf-8\n"
 
 #. TRANSLATORS: Name of first column in the button map preferences.
@@ -1876,7 +1876,7 @@ msgstr "계속(_N)"
 #, python-brace-format
 msgctxt "Destructive action confirm dialog: warning message"
 msgid "You risk losing {abbreviated_time} of unsaved painting."
-msgstr "저장하지 않은 그림의 {abbreviated_time}을 잃을 위험이 있습니다."
+msgstr "저장하지 않은 그림의 약 {abbreviated_time} 정도를 잃을 위험이 있습니다."
 
 #: ../gui/filehandling.py:804
 msgctxt "File→New: confirm dialog: title question"
@@ -2678,10 +2678,10 @@ msgstr ""
 #: ../gui/meta.py:39
 msgctxt "About dialog: copyright statement"
 msgid ""
-"Copyright (C) 2005-2017\n"
+"Copyright (C) 2005-2020\n"
 "Martin Renold and the MyPaint Development Team"
 msgstr ""
-"Copyright (C) 2005-2017\n"
+"Copyright (C) 2005-2020\n"
 "Martin Renold와 MyPaint 개발 팀"
 
 #: ../gui/meta.py:45
@@ -4395,8 +4395,8 @@ msgid ""
 "• The space bar can be used like Button2.\n"
 "• Some tablet pads' buttons cannot be held down when pressed."
 msgstr ""
-"• 스페이스 바는 Button2처럼 사용할 수 있습니다.\n"
-"• 일부 태블릿 패드의 버튼을 누르면 누를 수 없습니다."
+"스페이바를 button2 처럼 사용할 수 있습니다.\n"
+"눌렀을경우 몇몇 종의 타블랫 패드의 버튼이 작동이 되지 않을 수 있습니다"
 
 #: ../po/tmp/preferenceswindow.glade.h:33
 msgctxt "Prefs Dialog|Button|"
@@ -4753,6 +4753,9 @@ msgid ""
 "and yellow is opposite blue. CIECAM02 and NCS present a similar model. Here "
 "we use pure display red, yellow etc. as the four primaries."
 msgstr ""
+"카디날 포인트에서 반대 쌍으로 배열 된 4개의 &apos;심리적 원색 &apos;또는&apos; 독특한 색조&apos;를 사용하는 색상 "
+"이론에 기반하는 휠의 빠르고 더러운 근사치. 레드는 그린의 반대, 예로우는 블루의 반대입니다. CIECAM02와 NCS는 유사한 모델을 "
+"제시합니다. 여기서는 순수한 디스플레이 레드, 예로우 등을 네 개의 기본으로 사용합니다."
 
 #: ../po/tmp/preferenceswindow.glade.h:101
 msgctxt "Prefs Dialog|Color|Color Wheel|Primaries|RYGB|"
@@ -4763,6 +4766,9 @@ msgid ""
 "blue. CIECAM02 and NCS present a similar model. Here we use pure display "
 "red, yellow etc. as the four primaries."
 msgstr ""
+"카디날 포인트에서 반대 쌍으로 배열 된 4 개의 '심리적 기본 요소'또는 '고유 한 색조'를 사용하는 색상 이론에 의해 알려지는 휠의 "
+"빠르고 더러운 근사치. 빨간색은 녹색 반대, 노란색은 파란색 반대입니다. CIECAM02와 NCS는 유사한 모델을 제시합니다. 여기서는 "
+"순수한 디스플레이 빨강, 노랑 등을 네 개의 기본으로 사용합니다."
 
 #. Options affecting color wheels
 #: ../po/tmp/preferenceswindow.glade.h:103
@@ -4937,7 +4943,7 @@ msgstr "되돌리기"
 #: ../po/tmp/resources.xml.h:11
 msgctxt "Accel Editor (descriptions)"
 msgid "Reload the file your current work was loaded from."
-msgstr "현재 작업이 불러와진 파일을 다시 불러옵니다."
+msgstr "현재 작업으로 불러온 파일을 다시 불러옵니다."
 
 #: ../po/tmp/resources.xml.h:12
 msgctxt "Menu→File (labels), Accel Editor (labels)"
@@ -4976,8 +4982,7 @@ msgstr "내보내기…"
 
 #: ../po/tmp/resources.xml.h:19
 msgid "Export your work to a file, but keep working on the same file."
-msgstr ""
-"작업을 파일로 내보내지만 사용자는 동일한 파일에서 계속 작업을 진행합니다."
+msgstr "작업을 파일로 내보내고 사용자는 동일한 파일에서 계속 작업을 진행합니다."
 
 #: ../po/tmp/resources.xml.h:20
 msgctxt "Menu→File (labels), Accel Editor (labels)"

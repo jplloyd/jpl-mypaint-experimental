@@ -2712,10 +2712,10 @@ msgstr "Rita ellipser; Shift roterar, Ctrl begränsar förhållandet/vinkeln"
 #: ../gui/meta.py:39
 msgctxt "About dialog: copyright statement"
 msgid ""
-"Copyright (C) 2005-2017\n"
+"Copyright (C) 2005-2020\n"
 "Martin Renold and the MyPaint Development Team"
 msgstr ""
-"Copyright (C) 2005-2017\n"
+"Copyright (C) 2005-2020\n"
 "Martin Renold och MyPaints utvecklingsteam"
 
 #: ../gui/meta.py:45
@@ -2750,7 +2750,7 @@ msgstr "flyttbarhet"
 #: ../gui/meta.py:68
 msgctxt "About dialog: credits: tasks"
 msgid "project management"
-msgstr "Projekthantering"
+msgstr "projekthantering"
 
 #: ../gui/meta.py:72
 msgctxt "About dialog: credits: tasks: brush presets and icons"
@@ -2805,7 +2805,16 @@ msgstr ", "
 #: ../gui/meta.py:208
 msgctxt "About dialog: credits: translator credits (your name(s) here!)"
 msgid "translator-credits"
-msgstr "översättare"
+msgstr ""
+"Griatch, 2009-2012\n"
+"David Grundberg, 2010\n"
+"Martin Trokenheim, 2015\n"
+"Fredrik Lundin, 2015\n"
+"Sebastian Rasmussen, 2018\n"
+"Anders Jonsson, 2018\n"
+"Jesper Lloyd, 2019-2020\n"
+"Henrik Cederblad, 2019"
+
 
 #. TRANSLATORS:"Brush radius" for the options panel. Short.
 #: ../gui/mode.py:582
