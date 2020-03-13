@@ -1,3 +1,5 @@
+Don't rely on this branch for stability!
+
 <p align="center">
     <img src="pixmaps/mypaint_logo.png?raw=true" height="100px"/>
     <h1 align="center">MyPaint</h1>
